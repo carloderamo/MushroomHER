@@ -43,8 +43,6 @@ class CriticNetwork(nn.Module):
                                 gain=nn.init.calculate_gain('linear'))
 
     def forward(self, state, action):
-
-
         state_action = torch.cat((state.float(), action.float()), dim=1)
         features1 = F.relu(self._h1(state_action))
         features2 = F.relu(self._h2(features1))
@@ -77,18 +75,16 @@ class ActorNetwork(nn.Module):
         nn.init.xavier_uniform_(self._a.weight,
                                 gain=nn.init.calculate_gain('tanh'))
 
-    def forward(self, state, output_features=False):
-
-
+    def forward(self, state, unscaled=False):
         features1 = F.relu(self._h1(torch.squeeze(state, 1).float()))
         features2 = F.relu(self._h2(features1))
         features3 = F.relu(self._h3(features2))
-        a = torch.tanh(self._a(features3)) * 5.
 
-        if output_features:
-            return features3, a
+        out = torch.tanh(self._a(features3))
+        if unscaled:
+            return out
         else:
-            return a
+            return out * 5.
 
 
 def get_stats(dataset, gamma):
