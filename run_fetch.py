@@ -101,6 +101,8 @@ def get_stats(dataset, gamma):
     print('J: ', np.mean(J))
     print('S: ', np.mean(S))
 
+    return J, S
+
 
 def print_epoch(epoch):
     print(
@@ -178,10 +180,15 @@ def experiment(exp_id, args):
     core = Core(agent, mdp)
 
     # RUN
+    scores = list()
+    successes = list()
+
     print_epoch(0)
     print('--Evaluation--')
     dataset = core.evaluate(n_episodes=args.test_episodes, render=False)
-    get_stats(dataset, mdp.info.gamma)
+    j, s = get_stats(dataset, mdp.info.gamma)
+    scores += j
+    successes += s
 
     for i in range(1, max_epochs):
         print_epoch(i)
@@ -195,7 +202,11 @@ def experiment(exp_id, args):
         sigma_policy = np.eye(n_actions) * 1e-6
         agent.policy.set_sigma(sigma_policy)
         dataset = core.evaluate(n_episodes=test_episodes, render=False)
-        get_stats(dataset, mdp.info.gamma)
+        j, s = get_stats(dataset, mdp.info.gamma)
+        scores += j
+        successes += s
+
+    return scores, successes
 
 
 if __name__ == '__main__':
@@ -260,5 +271,7 @@ if __name__ == '__main__':
                               for i in range(args.n_exp))
 
     scores = np.array([o[0] for o in out])
+    success = np.array([o[1] for o in out])
 
     np.save(folder_name + 'scores.npy', scores)
+    np.save(folder_name + 'success.npy', success)
