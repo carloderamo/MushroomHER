@@ -25,6 +25,7 @@ class HER(ReplayMemory):
             self._rewards[self._idx] = self._reward_function(
                 dataset[i][3]['achieved_goal'],
                 dataset[i][3]['desired_goal'],
+                {}
             )
             self._rewards[self._idx] = dataset[i][2]
 

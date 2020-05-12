@@ -137,10 +137,8 @@ def experiment(exp_id, args):
                          output_shape=(1,),
                          use_cuda=args.use_cuda)
 
-    reward_function = lambda x, y: x + y
-
     if args.replay == 'her':
-        replay_memory = HER(max_replay_size, reward_function, args.sampling)
+        replay_memory = HER(max_replay_size, mdp.compute_reward, args.sampling)
     else:
         raise ValueError
 

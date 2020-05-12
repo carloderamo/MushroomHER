@@ -50,6 +50,9 @@ class FetchEnv(Environment):
         except:
             pass
 
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        return self.env.compute_reward(achieved_goal, desired_goal, info)
+
     @staticmethod
     def _convert_gym_observation_space(space):
         low = np.append(space['observation'].low, space['desired_goal'].low)
