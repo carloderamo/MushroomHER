@@ -60,28 +60,28 @@ class DDPG(DeepAC):
 
     def fit(self, dataset):
         self._replay_memory.add(dataset)
-        if self._replay_memory.initialized:
-            for _ in range(self._optimization_steps):
-                state, action, reward, next_state, absorbing, _ =\
-                    self._replay_memory.get(self._batch_size)
 
-                q_next = self._next_q(next_state, absorbing)
-                q = reward + self.mdp_info.gamma * q_next
-                q = np.clip(q, -1 / (1 - self.mdp_info.gamma), 0)
+        for _ in range(self._optimization_steps):
+            state, action, reward, next_state, absorbing, _ =\
+                self._replay_memory.get(self._batch_size)
 
-                self._critic_approximator.fit(state, action, q,
-                                              **self._critic_fit_params)
+            q_next = self._next_q(next_state, absorbing)
+            q = reward + self.mdp_info.gamma * q_next
+            q = np.clip(q, -1 / (1 - self.mdp_info.gamma), 0)
 
-                if self._fit_count % self._policy_delay == 0:
-                    loss = self._loss(state)
-                    self._optimize_actor_parameters(loss)
+            self._critic_approximator.fit(state, action, q,
+                                          **self._critic_fit_params)
 
-                self._fit_count += 1
+            if self._fit_count % self._policy_delay == 0:
+                loss = self._loss(state)
+                self._optimize_actor_parameters(loss)
 
-            self._update_target(self._critic_approximator,
-                                self._target_critic_approximator)
-            self._update_target(self._actor_approximator,
-                                self._target_actor_approximator)
+            self._fit_count += 1
+
+        self._update_target(self._critic_approximator,
+                            self._target_critic_approximator)
+        self._update_target(self._actor_approximator,
+                            self._target_actor_approximator)
 
     def _loss(self, state):
         action = self._actor_approximator(state, output_tensor=True)
@@ -90,18 +90,6 @@ class DDPG(DeepAC):
         return -q.mean()
 
     def _next_q(self, next_state, absorbing):
-        """
-        Args:
-            next_state (np.ndarray): the states where next action has to be
-                evaluated;
-            absorbing (np.ndarray): the absorbing flag for the states in
-                ``next_state``.
-
-        Returns:
-            Action-values returned by the critic for ``next_state`` and the
-            action returned by the actor.
-
-        """
         a = self._target_actor_approximator(next_state)
 
         q = self._target_critic_approximator.predict(next_state, a)
@@ -112,3 +100,8 @@ class DDPG(DeepAC):
     def _post_load(self):
         if self._optimizer is not None:
             self._parameters = list(self._actor_approximator.model.network.parameters())
+
+    def draw_action(self, state):
+        state = np.append(state['observation'], state['desired_goal'])
+
+        return self.policy.draw_action(state)

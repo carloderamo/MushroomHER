@@ -2,7 +2,6 @@ import argparse
 import datetime
 import pathlib
 import pickle
-import sys
 
 import numpy as np
 import torch
@@ -11,11 +10,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 from joblib import delayed, Parallel
 
-from mushroom_rl.algorithms.actor_critic import DDPG
+from mushroom_rl.core import Core
 from mushroom_rl.policy import OrnsteinUhlenbeckPolicy
 from mushroom_rl.utils.dataset import compute_J
 
-from core import Core
+from ddpg import DDPG
 from fetch_env import FetchEnv
 from her import HER
 
@@ -80,7 +79,7 @@ class ActorNetwork(nn.Module):
         features1 = F.relu(self._h1(torch.squeeze(state, 1).float()))
         features2 = F.relu(self._h2(features1))
         features3 = F.relu(self._h3(features2))
-        a = F.tanh(self._a(features3)) * 5.
+        a = torch.tanh(self._a(features3)) * 5.
 
         return a
 
@@ -105,12 +104,19 @@ def experiment(exp_id, args):
 
     # Settings
     if args.debug:
-        pass
+        evaluation_frequency = 16
+        n_cycles = 4
+        max_epochs = 32
+        test_epochs = 4
+        max_replay_size = 1000
+        batch_size = 4
     else:
-        initial_replay_size = args.initial_replay_size
+        evaluation_frequency = args.evaluation_frequency
+        n_cycles = args.n_cycles
+        max_epochs = args.max_epochs
+        test_epochs = args.test_epochs
         max_replay_size = args.max_replay_size
         batch_size = args.batch_size
-        tau = args.tau
 
     # Approximator
     actor_input_shape = mdp.info.observation_space.shape
@@ -131,8 +137,10 @@ def experiment(exp_id, args):
                          output_shape=(1,),
                          use_cuda=args.use_cuda)
 
+    reward_function = lambda x, y: x + y
+
     if args.replay == 'her':
-        replay_memory = HER(args.initial_replay_size, args.max_replay_size)
+        replay_memory = HER(max_replay_size, reward_function, args.sampling)
     else:
         raise ValueError
 
@@ -140,7 +148,7 @@ def experiment(exp_id, args):
     if args.alg == 'ddpg':
         agent = DDPG(mdp.info, policy_class, policy_params,
                      actor_params, actor_optimizer, critic_params,
-                     args.batch_size, replay_memory, args.tau,
+                     batch_size, replay_memory, args.tau,
                      args.optimization_steps)
     else:
         raise ValueError
@@ -155,14 +163,14 @@ def experiment(exp_id, args):
     J = compute_J(dataset, mdp.info.gamma)
     print('J: ', np.mean(J))
 
-    for i in range(1, args.max_epochs):
+    for i in range(1, max_epochs):
         print_epoch(i)
         print("--Learning--")
-        core.learn(n_episodes=args.evaluation_frequency * args.n_cycles,
-                   n_episodes_per_fit=args.evaluation_frequency)
+        core.learn(n_episodes=evaluation_frequency * n_cycles,
+                   n_episodes_per_fit=evaluation_frequency)
 
         print("--Evaluation--")
-        dataset = core.evaluate(n_steps=args.test_epochs, render=False)
+        dataset = core.evaluate(n_steps=test_epochs, render=False)
         J = compute_J(dataset, mdp.info.gamma)
         print('J: ', np.mean(J))
 
@@ -172,20 +180,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     arg_game = parser.add_argument_group('Name')
-    arg_game.add_argument("--name")
-    arg_game.add_argument("--n-exp", type=int)
+    arg_game.add_argument("--name", type=str, default='FetchReach-v1')
+    arg_game.add_argument("--n-exp", type=int, default=1)
 
     arg_mem = parser.add_argument_group('Replay Memory')
-    arg_mem.add_argument("--initial-replay-size", type=int, default=64,
-                         help='Initial size of the replay memory.')
     arg_mem.add_argument("--max-replay-size", type=int, default=1000000,
                          help='Max size of the replay memory.')
 
     arg_alg = parser.add_argument_group('Algorithm')
-    arg_alg.add_argument("--alg", type=str, default='her',
+    arg_alg.add_argument("--alg", type=str, default='ddpg',
                          choices=['ddpg', 'td3', 'sac'])
     arg_alg.add_argument("--replay", type=str, default='her',
                          choices=['her', 'cher', 'dher', 'sphere'])
+    arg_alg.add_argument("--sampling", type=str, default='final',
+                         choices=['final', 'future', 'episode', 'random'])
     arg_alg.add_argument("--batch-size", type=int, default=128,
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.95)
