@@ -112,8 +112,8 @@ def print_epoch(epoch):
         '----------------------------------------------------------------')
 
 
-def experiment(exp_id, args):
-    np.random.seed(exp_id)
+def experiment(exp_id, folder_name, args):
+    np.random.seed()
 
     # MDP
     mdp = FetchEnv(args.name)
@@ -185,26 +185,37 @@ def experiment(exp_id, args):
 
     print_epoch(0)
     print('--Evaluation--')
-    dataset = core.evaluate(n_episodes=args.test_episodes, render=False)
+    agent.policy.set_weights(agent._target_actor_approximator.get_weights())
+    dataset = core.evaluate(n_episodes=args.test_episodes, render=args.render,
+                            quiet=args.quiet)
     j, s = get_stats(dataset, mdp.info.gamma)
     scores += j
     successes += s
 
+    np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+    np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+
     for i in range(1, max_epochs):
         print_epoch(i)
         print("--Learning--")
+        agent.policy.set_weights(agent._actor_approximator.get_weights())
         sigma_policy = np.diag(action_range * .05)
         agent.policy.set_sigma(sigma_policy)
         core.learn(n_episodes=evaluation_frequency * n_cycles,
-                   n_episodes_per_fit=evaluation_frequency)
+                   n_episodes_per_fit=evaluation_frequency, quiet=args.quiet)
 
         print("--Evaluation--")
+        agent.policy.set_weights(agent._target_actor_approximator.get_weights())
         sigma_policy = np.eye(n_actions) * 1e-6
         agent.policy.set_sigma(sigma_policy)
-        dataset = core.evaluate(n_episodes=test_episodes, render=False)
+        dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
+                                quiet=args.quiet)
         j, s = get_stats(dataset, mdp.info.gamma)
         scores += j
         successes += s
+
+        np.save(folder_name + '/scores.npy', scores)
+        np.save(folder_name + '/successes.npy', successes)
 
     return scores, successes
 
@@ -245,10 +256,6 @@ if __name__ == '__main__':
     arg_utils = parser.add_argument_group('Utils')
     arg_utils.add_argument('--use-cuda', action='store_true',
                            help='Flag specifying whether to use the GPU.')
-    arg_utils.add_argument('--load', type=str,
-                           help='Path of the model to be loaded.')
-    arg_utils.add_argument('--save', action='store_true',
-                           help='Flag specifying whether to save the model.')
     arg_utils.add_argument('--render', action='store_true',
                            help='Flag specifying whether to render the game.')
     arg_utils.add_argument('--quiet', action='store_true',
@@ -267,7 +274,7 @@ if __name__ == '__main__':
     with open(folder_name + 'args.pkl', 'wb') as f:
         pickle.dump(args, f)
 
-    out = Parallel(n_jobs=-1)(delayed(experiment)(i, args)
+    out = Parallel(n_jobs=-1)(delayed(experiment)(i, folder_name, args)
                               for i in range(args.n_exp))
 
     scores = np.array([o[0] for o in out])
