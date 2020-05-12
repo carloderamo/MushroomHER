@@ -104,5 +104,6 @@ class DDPG(DeepAC):
 
     def draw_action(self, state):
         state = np.append(state['observation'], state['desired_goal'])
+        state = self._replay_memory.normalize_and_clip(state)
 
         return self.policy.draw_action(state)

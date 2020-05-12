@@ -75,7 +75,12 @@ class HER(ReplayMemory):
             ab.append(self._absorbing[i])
             last.append(self._last[i])
 
-        s = np.clip((np.array(s) - self._mu) / np.sqrt(self._sigma2), -5., 5.)
-        ss = np.clip((np.array(ss) - self._mu) / np.sqrt(self._sigma2), -5., 5.)
+        s = self.normalize_and_clip(s)
+        ss = self.normalize_and_clip(ss)
 
         return s, np.array(a), np.array(r), ss, np.array(ab), np.array(last)
+
+    def normalize_and_clip(self, s):
+        return np.clip(
+            (np.array(s) - self._mu) / (np.sqrt(self._sigma2) + 1e-10), -5., 5.
+        )
