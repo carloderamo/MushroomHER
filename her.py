@@ -23,6 +23,10 @@ class HER(ReplayMemory):
 
         self._sample_goals = sample_goals
 
+        self._mu = 0
+        self._sigma2 = 0
+        self._count = 0
+
         super().__init__(0, max_size)
 
     def add(self, dataset):
@@ -46,3 +50,32 @@ class HER(ReplayMemory):
                 if self._idx == self._max_size:
                     self._full = True
                     self._idx = 0
+
+                self._count += 1
+                prev_mu = self._mu
+                self._mu = (
+                    self._mu * (self._count - 1) + state_goal
+                ) / self._count
+                self._sigma2 = (self._sigma2 * (self._count - 1) + (
+                    state_goal - prev_mu) * (state_goal - self._mu)
+                ) / self._count
+
+    def get(self, n_samples):
+        s = list()
+        a = list()
+        r = list()
+        ss = list()
+        ab = list()
+        last = list()
+        for i in np.random.randint(self.size, size=n_samples):
+            s.append(np.array(self._states[i]))
+            a.append(self._actions[i])
+            r.append(self._rewards[i])
+            ss.append(np.array(self._next_states[i]))
+            ab.append(self._absorbing[i])
+            last.append(self._last[i])
+
+        s = np.clip((np.array(s) - self._mu) / np.sqrt(self._sigma2), -5., 5.)
+        ss = np.clip((np.array(ss) - self._mu) / np.sqrt(self._sigma2), -5., 5.)
+
+        return s, np.array(a), np.array(r), ss, np.array(ab), np.array(last)

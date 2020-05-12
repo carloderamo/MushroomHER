@@ -75,16 +75,16 @@ class ActorNetwork(nn.Module):
         nn.init.xavier_uniform_(self._a.weight,
                                 gain=nn.init.calculate_gain('tanh'))
 
-    def forward(self, state, unscaled=False):
+    def forward(self, state, scaled=True):
         features1 = F.relu(self._h1(torch.squeeze(state, 1).float()))
         features2 = F.relu(self._h2(features1))
         features3 = F.relu(self._h3(features2))
 
         out = torch.tanh(self._a(features3))
-        if unscaled:
-            return out
-        else:
+        if scaled:
             return out * 5.
+        else:
+            return out
 
 
 def get_stats(dataset, gamma):
@@ -263,7 +263,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    folder_name = './logs/' + args.alg + '_' + args.name + '/' + \
+    folder_name = './logs/' + args.alg + '_' + args.name + '_' + \
         datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + '/'
     pathlib.Path(folder_name).mkdir(parents=True)
 
