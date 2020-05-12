@@ -8,19 +8,24 @@ class HER(ReplayMemory):
     def __init__(self, max_size, reward_function, n_additional_goals, sampling):
         self._reward_function = reward_function
         self._n_additional_goals = n_additional_goals
-        self._sampling = sampling
+
+        if sampling == 'final':
+            def sample_goals(dataset):
+                abs_idxs = np.cumsum(episodes_length(dataset)) - 1
+                sampled_idxs = np.random.choice(abs_idxs, size=4)
+                sampled_goals = np.array(
+                    [dataset[x][0]['achieved_goal'] for x in sampled_idxs]
+                )
+                return sampled_goals
+        else:
+            raise ValueError
+
+        self._sample_goals = sample_goals
 
         super().__init__(0, max_size)
 
     def add(self, dataset):
-        if self._sampling == 'final':
-            abs_idxs = np.cumsum(episodes_length(dataset)) - 1
-            sampled_idxs = np.random.choice(abs_idxs, size=4)
-            sampled_goals = np.array(
-                [dataset[x][0]['achieved_goal'] for x in sampled_idxs]
-            )
-        else:
-            raise ValueError
+        sampled_goals = self._sample_goals(dataset)
 
         for i in range(len(dataset)):
             goals = np.append([dataset[i][0]['desired_goal']], sampled_goals, axis=0)

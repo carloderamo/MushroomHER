@@ -11,12 +11,12 @@ import torch.nn.functional as F
 from joblib import delayed, Parallel
 
 from mushroom_rl.core import Core
-from mushroom_rl.policy import OrnsteinUhlenbeckPolicy
 from mushroom_rl.utils.dataset import compute_J
 
 from ddpg import DDPG
 from fetch_env import FetchEnv
 from her import HER
+from policy import EpsilonGaussianPolicy
 
 
 class CriticNetwork(nn.Module):
@@ -43,6 +43,8 @@ class CriticNetwork(nn.Module):
                                 gain=nn.init.calculate_gain('linear'))
 
     def forward(self, state, action):
+
+
         state_action = torch.cat((state.float(), action.float()), dim=1)
         features1 = F.relu(self._h1(state_action))
         features2 = F.relu(self._h2(features1))
@@ -75,13 +77,18 @@ class ActorNetwork(nn.Module):
         nn.init.xavier_uniform_(self._a.weight,
                                 gain=nn.init.calculate_gain('tanh'))
 
-    def forward(self, state):
+    def forward(self, state, output_features=False):
+
+
         features1 = F.relu(self._h1(torch.squeeze(state, 1).float()))
         features2 = F.relu(self._h2(features1))
         features3 = F.relu(self._h3(features2))
         a = torch.tanh(self._a(features3)) * 5.
 
-        return a
+        if output_features:
+            return features3, a
+        else:
+            return a
 
 
 def print_epoch(epoch):
@@ -97,10 +104,14 @@ def experiment(exp_id, args):
 
     # MDP
     mdp = FetchEnv(args.name)
+    n_actions = mdp.info.action_space.shape[0]
+    action_range = mdp.info.action_space.high - mdp.info.action_space.low
 
     # Policy
-    policy_class = OrnsteinUhlenbeckPolicy
-    policy_params = dict(sigma=np.ones(1) * .2, theta=.15, dt=1e-2)
+    policy_class = EpsilonGaussianPolicy
+    sigma_policy = np.eye(n_actions) * 1e-6
+    policy_params = dict(sigma=sigma_policy, epsilon=.2,
+                         action_space=mdp.info.action_space)
 
     # Settings
     if args.debug:
@@ -165,10 +176,14 @@ def experiment(exp_id, args):
     for i in range(1, max_epochs):
         print_epoch(i)
         print("--Learning--")
+        sigma_policy = np.diag(action_range * .05)
+        agent.policy.set_sigma(sigma_policy)
         core.learn(n_episodes=evaluation_frequency * n_cycles,
                    n_episodes_per_fit=evaluation_frequency)
 
         print("--Evaluation--")
+        sigma_policy = np.eye(n_actions) * 1e-6
+        agent.policy.set_sigma(sigma_policy)
         dataset = core.evaluate(n_steps=test_epochs, render=False)
         J = compute_J(dataset, mdp.info.gamma)
         print('J: ', np.mean(J))

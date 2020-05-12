@@ -84,10 +84,11 @@ class DDPG(DeepAC):
                             self._target_actor_approximator)
 
     def _loss(self, state):
-        action = self._actor_approximator(state, output_tensor=True)
+        features, action = self._actor_approximator(state, output_features=True,
+                                                    output_tensor=True)
         q = self._critic_approximator(state, action, output_tensor=True)
 
-        return -q.mean()
+        return -q.mean() + features.norm() ** 2
 
     def _next_q(self, next_state, absorbing):
         a = self._target_actor_approximator(next_state)
