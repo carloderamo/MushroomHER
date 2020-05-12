@@ -38,7 +38,10 @@ class FetchEnv(Environment):
     def step(self, action):
         action = self._convert_action(action)
 
-        return self.env.step(action)
+        state, reward, absorbing, info = self.env.step(action)
+        state['info'] = info
+
+        return state, reward, absorbing, info
 
     def render(self, mode='human'):
         self.env.render(mode=mode)

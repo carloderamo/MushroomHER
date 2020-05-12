@@ -10,8 +10,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from joblib import delayed, Parallel
 
+from mushroom_rl.utils.dataset import compute_J, episodes_length
 from mushroom_rl.core import Core
-from mushroom_rl.utils.dataset import compute_J
 
 from ddpg import DDPG
 from fetch_env import FetchEnv
@@ -91,6 +91,17 @@ class ActorNetwork(nn.Module):
             return a
 
 
+def get_stats(dataset, gamma):
+    J = compute_J(dataset, gamma)
+    abs_idxs = np.cumsum(episodes_length(dataset)) - 1
+    S = list()
+    for idx in abs_idxs:
+        S.append(dataset[idx][3]['info']['is_success'])
+
+    print('J: ', np.mean(J))
+    print('S: ', np.mean(S))
+
+
 def print_epoch(epoch):
     print(
         '################################################################')
@@ -118,14 +129,14 @@ def experiment(exp_id, args):
         evaluation_frequency = 16
         n_cycles = 4
         max_epochs = 32
-        test_epochs = 4
+        test_episodes = 4
         max_replay_size = 1000
         batch_size = 4
     else:
         evaluation_frequency = args.evaluation_frequency
         n_cycles = args.n_cycles
         max_epochs = args.max_epochs
-        test_epochs = args.test_epochs
+        test_episodes = args.test_episodes
         max_replay_size = args.max_replay_size
         batch_size = args.batch_size
 
@@ -169,9 +180,8 @@ def experiment(exp_id, args):
     # RUN
     print_epoch(0)
     print('--Evaluation--')
-    dataset = core.evaluate(n_steps=args.test_epochs, render=False)
-    J = compute_J(dataset, mdp.info.gamma)
-    print('J: ', np.mean(J))
+    dataset = core.evaluate(n_episodes=args.test_episodes, render=False)
+    get_stats(dataset, mdp.info.gamma)
 
     for i in range(1, max_epochs):
         print_epoch(i)
@@ -184,9 +194,8 @@ def experiment(exp_id, args):
         print("--Evaluation--")
         sigma_policy = np.eye(n_actions) * 1e-6
         agent.policy.set_sigma(sigma_policy)
-        dataset = core.evaluate(n_steps=test_epochs, render=False)
-        J = compute_J(dataset, mdp.info.gamma)
-        print('J: ', np.mean(J))
+        dataset = core.evaluate(n_episodes=test_episodes, render=False)
+        get_stats(dataset, mdp.info.gamma)
 
 
 if __name__ == '__main__':
@@ -219,7 +228,7 @@ if __name__ == '__main__':
     arg_alg.add_argument("--optimization-steps", type=int, default=40)
     arg_alg.add_argument("--max-epochs", type=int, default=200,
                          help='Total number of learning steps.')
-    arg_alg.add_argument("--test-epochs", type=int, default=10,
+    arg_alg.add_argument("--test-episodes", type=int, default=10,
                          help='Number of epochs for each evaluation.')
 
     arg_utils = parser.add_argument_group('Utils')
