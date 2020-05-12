@@ -138,7 +138,8 @@ def experiment(exp_id, args):
                          use_cuda=args.use_cuda)
 
     if args.replay == 'her':
-        replay_memory = HER(max_replay_size, mdp.compute_reward, args.sampling)
+        replay_memory = HER(max_replay_size, mdp.compute_reward,
+                            args.n_additional_goals, args.sampling)
     else:
         raise ValueError
 
@@ -190,6 +191,7 @@ if __name__ == '__main__':
                          choices=['ddpg', 'td3', 'sac'])
     arg_alg.add_argument("--replay", type=str, default='her',
                          choices=['her', 'cher', 'dher', 'sphere'])
+    arg_alg.add_argument("--n-additional-goals", type=int, default=4)
     arg_alg.add_argument("--sampling", type=str, default='final',
                          choices=['final', 'future', 'episode', 'random'])
     arg_alg.add_argument("--batch-size", type=int, default=128,
