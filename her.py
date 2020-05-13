@@ -23,7 +23,6 @@ class HER(ReplayMemory):
                 abs_idxs = np.cumsum(episodes_length(dataset))
                 prev_abs_idxs = abs_idxs[abs_idxs <= i]
                 episode_end = abs_idxs[len(prev_abs_idxs)]
-                print(i, episode_end)
                 sampled_idxs = np.random.randint(i, episode_end,
                                                  size=self._n_additional_goals)
                 sampled_goals = np.array(
