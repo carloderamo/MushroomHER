@@ -92,20 +92,7 @@ class HER(ReplayMemory):
                 ) / self._count
 
     def get(self, n_samples):
-        s = list()
-        a = list()
-        r = list()
-        ss = list()
-        ab = list()
-        last = list()
-        for i in np.random.randint(self.size, size=n_samples):
-            s.append(np.array(self._states[i]))
-            a.append(self._actions[i])
-            r.append(self._rewards[i])
-            ss.append(np.array(self._next_states[i]))
-            ab.append(self._absorbing[i])
-            last.append(self._last[i])
-
+        s, a, r, ss, ab, last = super().get(n_samples)
         s = self.normalize_and_clip(s)
         ss = self.normalize_and_clip(ss)
 
