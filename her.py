@@ -10,9 +10,41 @@ class HER(ReplayMemory):
         self._n_additional_goals = n_additional_goals
 
         if sampling == 'final':
-            def sample_goals(dataset):
+            def sample_goals(dataset, _):
                 abs_idxs = np.cumsum(episodes_length(dataset)) - 1
                 sampled_idxs = np.random.choice(abs_idxs,
+                                                size=self._n_additional_goals)
+                sampled_goals = np.array(
+                    [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
+                )
+                return sampled_goals
+        elif sampling == 'future':
+            def sample_goals(dataset, i):
+                abs_idxs = np.cumsum(episodes_length(dataset))
+                prev_abs_idxs = abs_idxs[abs_idxs <= i]
+                episode_end = abs_idxs[len(prev_abs_idxs)]
+                print(i, episode_end)
+                sampled_idxs = np.random.randint(i, episode_end,
+                                                 size=self._n_additional_goals)
+                sampled_goals = np.array(
+                    [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
+                )
+                return sampled_goals
+        elif sampling == 'episode':
+            def sample_goals(dataset, i):
+                abs_idxs = np.cumsum(episodes_length(dataset))
+                prev_abs_idxs = abs_idxs[abs_idxs <= i]
+                episode_start = prev_abs_idxs[-1] if len(prev_abs_idxs) > 0 else 0
+                episode_end = abs_idxs[len(prev_abs_idxs)]
+                sampled_idxs = np.random.randint(episode_start, episode_end,
+                                                 size=self._n_additional_goals)
+                sampled_goals = np.array(
+                    [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
+                )
+                return sampled_goals
+        elif sampling == 'random':
+            def sample_goals(dataset, _):
+                sampled_idxs = np.random.choice(len(dataset),
                                                 size=self._n_additional_goals)
                 sampled_goals = np.array(
                     [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
@@ -31,7 +63,7 @@ class HER(ReplayMemory):
 
     def add(self, dataset):
         for i in range(len(dataset)):
-            sampled_goals = self._sample_goals(dataset)
+            sampled_goals = self._sample_goals(dataset, i)
             goals = np.append([dataset[i][0]['desired_goal']], sampled_goals, axis=0)
             for g in goals:
                 state_goal = np.append(dataset[i][0]['observation'], g)

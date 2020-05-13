@@ -1,3 +1,4 @@
+
 import argparse
 import datetime
 import pathlib
@@ -94,8 +95,11 @@ def get_stats(dataset, gamma):
     for idx in abs_idxs:
         S.append(dataset[idx][3]['info']['is_success'])
 
-    print('J: ', np.mean(J))
-    print('S: ', np.mean(S))
+    J = np.mean(J)
+    S = np.mean(S)
+
+    print('J: ', J)
+    print('S: ', S)
 
     return J, S
 
@@ -210,8 +214,8 @@ def experiment(exp_id, folder_name, args):
         scores += j
         successes += s
 
-        np.save(folder_name + '/scores.npy', scores)
-        np.save(folder_name + '/successes.npy', successes)
+        np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+        np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
 
     return scores, successes
 
@@ -277,4 +281,4 @@ if __name__ == '__main__':
     success = np.array([o[1] for o in out])
 
     np.save(folder_name + 'scores.npy', scores)
-    np.save(folder_name + 'success.npy', success)
+    np.save(folder_name + 'successes.npy', success)
