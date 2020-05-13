@@ -188,8 +188,8 @@ def experiment(exp_id, folder_name, args):
     dataset = core.evaluate(n_episodes=args.test_episodes, render=args.render,
                             quiet=args.quiet)
     j, s = get_stats(dataset, mdp.info.gamma)
-    scores += j
-    successes += s
+    scores.append(j)
+    successes.append(s)
 
     np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
     np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
@@ -210,8 +210,8 @@ def experiment(exp_id, folder_name, args):
         dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
                                 quiet=args.quiet)
         j, s = get_stats(dataset, mdp.info.gamma)
-        scores += j
-        successes += s
+        scores.append(j)
+        successes.append(s)
 
         np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
         np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
