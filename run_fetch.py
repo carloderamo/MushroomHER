@@ -182,7 +182,7 @@ def experiment(exp_id, folder_name, args):
         agent = DDPG(mdp.info, policy_class, policy_params,
                      actor_params, actor_optimizer, critic_params,
                      batch_size, replay_memory, args.tau,
-                     args.optimization_steps)
+                     args.optimization_steps, comm)
     else:
         raise ValueError
 
