@@ -5,6 +5,8 @@ from mushroom_rl.algorithms.actor_critic.deep_actor_critic import DeepAC
 from mushroom_rl.approximators import Regressor
 from mushroom_rl.approximators.parametric import TorchApproximator
 
+from utils import normalize_and_clip
+
 
 class DDPG(DeepAC):
     def __init__(self, mdp_info, policy_class, policy_params,
@@ -20,7 +22,8 @@ class DDPG(DeepAC):
         self._policy_delay = policy_delay
         self._fit_count = 0
 
-        self._replay_memory = replay_memory
+        if comm.Get_rank() == 0:
+            self._replay_memory = replay_memory
 
         target_critic_params = deepcopy(critic_params)
         self._critic_approximator = Regressor(TorchApproximator,
@@ -59,44 +62,36 @@ class DDPG(DeepAC):
         super().__init__(mdp_info, policy, actor_optimizer, policy_parameters)
 
     def fit(self, dataset):
-        self._replay_memory.add(dataset)
+        if self._comm.Get_rank() == 0:
+            self._replay_memory.add(dataset)
+            for i in range(self._comm.Get_size()):
+                if i == self._comm.Get_rank():
+                    continue
+                dataset += self._comm.recv(source=i)
+        else:
+            self._comm.send(dataset, dest=0)
 
         for _ in range(self._optimization_steps):
-            state = list()
-            action = list()
-            reward = list()
-            next_state = list()
-            absorbing = list()
-            for i in range(self._batch_size * self._comm.Get_size()):
-                rank_sampler = i // self._batch_size
-                if rank_sampler == self._comm.Get_rank():
-                    for j in range(self._comm.Get_size()):
-                        s, a, r, ss, ab, _ = self._replay_memory.get(1)
-                        if j == rank_sampler:
-                            continue
-                        self._comm.send([s, a, r, ss, ab], dest=j)
+            if self._comm.Get_rank() == 0:
+                state, action, reward, next_state, absorbing, _ =\
+                    self._replay_memory.get(self._batch_size * self._comm.Get_size())
+            else:
+                state = None
+                action = None
+                reward = None
+                next_state = None
+                absorbing = None
+            state, action, reward, next_state, absorbing = self._comm.bcast(
+                [state, action, reward, next_state, absorbing], root=0
+            )
 
-                        self._comm.Barrier()
-                else:
-                    for j in range(self._comm.Get_size()):
-                        if j == rank_sampler:
-                            continue
-                        out_state, out_action, out_reward, out_next_state, \
-                            out_absorbing = self._comm.recv(source=rank_sampler)
-
-                        self._comm.Barrier()
-
-                        state.append(out_state[0])
-                        action.append(out_action[0])
-                        reward.append(out_reward[0])
-                        next_state.append(out_next_state[0])
-                        absorbing.append(out_absorbing[0])
-
-            state = np.array(state)
-            action = np.array(action)
-            reward = np.array(reward)
-            next_state = np.array(next_state)
-            absorbing = np.array(absorbing)
+            start = self._batch_size * self._comm.Get_rank()
+            stop = start + self._batch_size
+            state = state[start:stop]
+            action = action[start:stop]
+            reward = reward[start:stop]
+            next_state = next_state[start:stop]
+            absorbing = absorbing[start:stop]
 
             q_next = self._next_q(next_state, absorbing)
             q = reward + self.mdp_info.gamma * q_next
@@ -137,6 +132,13 @@ class DDPG(DeepAC):
 
     def draw_action(self, state):
         state = np.append(state['observation'], state['desired_goal'])
-        state = self._replay_memory.normalize_and_clip(state)
+        if self._comm.Get_rank() == 0:
+            mu = self._replay_memory._mu
+            sigma2 = self._replay_memory._sigma2
+        else:
+            mu = None
+            sigma2 = None
+        mu, sigma2 = self._comm.bcast([mu, sigma2], root=0)
+        state = normalize_and_clip(state, mu, sigma2)
 
         return self.policy.draw_action(state)
