@@ -112,16 +112,9 @@ def print_epoch(epoch):
         '----------------------------------------------------------------')
 
 
-def experiment(exp_id, folder_name, args):
-    comm = MPI.COMM_WORLD
+def experiment(exp_id, comm, args, folder_name):
     rank = comm.Get_rank()
     n_threads = comm.Get_size()
-
-    folder_name += '_' + str(exp_id) + '_' + str(rank) + '/'
-
-    pathlib.Path(folder_name).mkdir(parents=True)
-    with open(folder_name + 'args.pkl', 'wb') as f:
-        pickle.dump(args, f)
 
     np.random.seed()
 
@@ -205,8 +198,9 @@ def experiment(exp_id, folder_name, args):
         scores.append(j)
         successes.append(s)
 
-        np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-        np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+        if comm.Get_rank() == 0:
+            np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+            np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
 
         comm.Barrier()
     else:
@@ -237,8 +231,9 @@ def experiment(exp_id, folder_name, args):
             scores.append(j)
             successes.append(s)
 
-            np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-            np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+            if comm.Get_rank() == 0:
+                np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+                np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
 
             comm.Barrier()
         else:
@@ -297,15 +292,25 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    folder_name = './logs/' + args.alg + '_' + args.name + '_' + \
-        datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    comm = MPI.COMM_WORLD
+
+    if comm.Get_rank() == 0:
+        folder_name = './logs/' + args.alg + '_' + args.name + '_' + \
+            datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+        pathlib.Path(folder_name).mkdir(parents=True)
+        with open(folder_name + 'args.pkl', 'wb') as f:
+            pickle.dump(args, f)
+    else:
+        folder_name = None
 
     outs = list()
     for i in range(args.n_exp):
-        outs.append(experiment(i, folder_name, args))
+        outs.append(experiment(i, comm, args, folder_name))
 
     scores = np.array([o[0] for o in outs])
     success = np.array([o[1] for o in outs])
 
-    np.save(folder_name + 'scores.npy', scores)
-    np.save(folder_name + 'successes.npy', success)
+    if comm.Get_rank() == 0:
+        np.save(folder_name + 'scores.npy', scores)
+        np.save(folder_name + 'successes.npy', success)
