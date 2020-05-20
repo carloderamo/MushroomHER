@@ -1,5 +1,6 @@
 import argparse
 import datetime
+from mpi4py import MPI
 import pathlib
 import pickle
 
@@ -112,6 +113,16 @@ def print_epoch(epoch):
 
 
 def experiment(exp_id, folder_name, args):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    n_threads = comm.Get_size()
+
+    folder_name += '_' + str(exp_id) + '_' + str(rank) + '/'
+
+    pathlib.Path(folder_name).mkdir(parents=True)
+    with open(folder_name + 'args.pkl', 'wb') as f:
+        pickle.dump(args, f)
+
     np.random.seed()
 
     # MDP
@@ -185,14 +196,24 @@ def experiment(exp_id, folder_name, args):
     print_epoch(0)
     print('--Evaluation--')
     agent.policy.set_weights(agent._target_actor_approximator.get_weights())
-    dataset = core.evaluate(n_episodes=args.test_episodes, render=args.render,
-                            quiet=args.quiet)
-    j, s = get_stats(dataset, mdp.info.gamma)
-    scores.append(j)
-    successes.append(s)
+    if rank == 0:
+        dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
+                                quiet=args.quiet)
+        for i in range(1, n_threads):
+            dataset += comm.recv(source=i)
+        j, s = get_stats(dataset, mdp.info.gamma)
+        scores.append(j)
+        successes.append(s)
 
-    np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-    np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+        np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+        np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+
+        comm.Barrier()
+    else:
+        dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
+                                quiet=args.quiet)
+        comm.send(dataset, dest=0)
+        comm.Barrier()
 
     for i in range(1, max_epochs):
         print_epoch(i)
@@ -207,14 +228,24 @@ def experiment(exp_id, folder_name, args):
         agent.policy.set_weights(agent._target_actor_approximator.get_weights())
         sigma_policy = np.eye(n_actions) * 1e-6
         agent.policy.set_sigma(sigma_policy)
-        dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
-                                quiet=args.quiet)
-        j, s = get_stats(dataset, mdp.info.gamma)
-        scores.append(j)
-        successes.append(s)
+        if rank == 0:
+            dataset = core.evaluate(n_episodes=test_episodes,
+                                    render=args.render, quiet=args.quiet)
+            for i in range(1, n_threads):
+                dataset += comm.recv(source=i)
+            j, s = get_stats(dataset, mdp.info.gamma)
+            scores.append(j)
+            successes.append(s)
 
-        np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-        np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+            np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+            np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+
+            comm.Barrier()
+        else:
+            dataset = core.evaluate(n_episodes=test_episodes,
+                                    render=args.render, quiet=args.quiet)
+            comm.send(dataset, dest=0)
+            comm.Barrier()
 
     return scores, successes
 
@@ -267,17 +298,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     folder_name = './logs/' + args.alg + '_' + args.name + '_' + \
-        datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + '/'
-    pathlib.Path(folder_name).mkdir(parents=True)
+        datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
-    with open(folder_name + 'args.pkl', 'wb') as f:
-        pickle.dump(args, f)
+    outs = list()
+    for i in range(args.n_exp):
+        outs.append(experiment(i, folder_name, args))
 
-    out = Parallel(n_jobs=-1)(delayed(experiment)(i, folder_name, args)
-                              for i in range(args.n_exp))
-
-    scores = np.array([o[0] for o in out])
-    success = np.array([o[1] for o in out])
+    scores = np.array([o[0] for o in outs])
+    success = np.array([o[1] for o in outs])
 
     np.save(folder_name + 'scores.npy', scores)
     np.save(folder_name + 'successes.npy', success)
