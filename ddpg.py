@@ -5,8 +5,6 @@ from mushroom_rl.algorithms.actor_critic.deep_actor_critic import DeepAC
 from mushroom_rl.approximators import Regressor
 from mushroom_rl.approximators.parametric import TorchApproximator
 
-from utils import normalize_and_clip
-
 
 class DDPG(DeepAC):
     def __init__(self, mdp_info, policy_class, policy_params,
@@ -22,8 +20,7 @@ class DDPG(DeepAC):
         self._policy_delay = policy_delay
         self._fit_count = 0
 
-        if comm.Get_rank() == 0:
-            self._replay_memory = replay_memory
+        self._replay_memory = replay_memory
 
         target_critic_params = deepcopy(critic_params)
         self._critic_approximator = Regressor(TorchApproximator,
@@ -62,16 +59,7 @@ class DDPG(DeepAC):
         super().__init__(mdp_info, policy, actor_optimizer, policy_parameters)
 
     def fit(self, dataset):
-        if self._comm.Get_rank() == 0:
-            for i in range(1, self._comm.Get_size()):
-                dataset += self._comm.recv(source=i)
-            self._replay_memory.add(dataset)
-
-            self._comm.Barrier()
-        else:
-            self._comm.send(dataset, dest=0)
-
-            self._comm.Barrier()
+        self._replay_memory.add(dataset)
 
         for _ in range(self._optimization_steps):
             if self._comm.Get_rank() == 0:
@@ -129,19 +117,6 @@ class DDPG(DeepAC):
 
     def draw_action(self, state):
         state = np.append(state['observation'], state['desired_goal'])
-        if self._comm.Get_rank() == 0:
-            mu = self._replay_memory._mu
-            sigma2 = self._replay_memory._sigma2
-            state = normalize_and_clip(state, self._replay_memory._mu,
-                                       self._replay_memory._sigma2)
-            for i in range(1, self._comm.Get_size()):
-                self._comm.send([mu, sigma2], dest=i)
-
-            self._comm.Barrier()
-        else:
-            mu, sigma2 = self._comm.recv(source=0)
-            state = normalize_and_clip(state, mu, sigma2)
-
-            self._comm.Barrier()
+        state = self._replay_memory.normalize_and_clip(state)
 
         return self.policy.draw_action(state)

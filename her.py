@@ -3,8 +3,6 @@ import numpy as np
 from mushroom_rl.utils.replay_memory import ReplayMemory
 from mushroom_rl.utils.dataset import episodes_length
 
-from utils import normalize_and_clip
-
 
 class HER(ReplayMemory):
     def __init__(self, max_size, reward_function, n_additional_goals, sampling):
@@ -95,7 +93,13 @@ class HER(ReplayMemory):
 
     def get(self, n_samples):
         s, a, r, ss, ab, last = super().get(n_samples)
-        s = normalize_and_clip(s, self._mu, self._sigma2)
-        ss = normalize_and_clip(ss, self._mu, self._sigma2)
+        s = self.normalize_and_clip(s)
+        ss = self.normalize_and_clip(ss)
 
         return s, np.array(a), np.array(r), ss, np.array(ab), np.array(last)
+
+    def normalize_and_clip(self, state):
+        return np.clip(
+            (np.array(state) - self._mu) / (np.sqrt(self._sigma2) + 1e-10),
+            -5., 5.
+        )
