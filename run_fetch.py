@@ -266,7 +266,7 @@ if __name__ == '__main__':
     arg_alg.add_argument("--alg", type=str, default='ddpg',
                          choices=['ddpg', 'td3', 'sac'])
     arg_alg.add_argument("--replay", type=str, default='her',
-                         choices=['her', 'cher', 'dher', 'sphere'])
+                         choices=['her', 'cher', 'dher'])
     arg_alg.add_argument("--n-additional-goals", type=int, default=4)
     arg_alg.add_argument("--sampling", type=str, default='final',
                          choices=['final', 'future', 'episode', 'random'])
