@@ -296,7 +296,7 @@ if __name__ == '__main__':
 
     if comm.Get_rank() == 0:
         folder_name = './logs/' + args.alg + '_' + args.name + '_' + \
-            datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + '/'
 
         pathlib.Path(folder_name).mkdir(parents=True)
         with open(folder_name + 'args.pkl', 'wb') as f:

@@ -62,37 +62,41 @@ class DDPG(DeepAC):
         self._replay_memory.add(dataset)
 
         for _ in range(self._optimization_steps):
-            state, action, reward, next_state, absorbing, _ = \
-                self._replay_memory.get(self._batch_size)
+            state = list()
+            action = list()
+            reward = list()
+            next_state = list()
+            absorbing = list()
+            for i in range(self._batch_size * self._comm.Get_size()):
+                rank_sampler = i // self._batch_size
+                if rank_sampler == self._comm.Get_rank():
+                    for j in range(self._comm.Get_size()):
+                        s, a, r, ss, ab, _ = self._replay_memory.get(1)
+                        if j == rank_sampler:
+                            continue
+                        self._comm.send([s, a, r, ss, ab], dest=j)
 
-            for i in range(self._comm.Get_size()):
-                if i == self._comm.Get_rank():
-                    continue
-                self._comm.send([state, action, reward, next_state, absorbing],
-                                dest=i)
+                        self._comm.Barrier()
+                else:
+                    for j in range(self._comm.Get_size()):
+                        if j == rank_sampler:
+                            continue
+                        out_state, out_action, out_reward, out_next_state, \
+                            out_absorbing = self._comm.recv(source=rank_sampler)
 
-            self._comm.Barrier()
+                        self._comm.Barrier()
 
-            for i in range(self._comm.Get_size()):
-                if i == self._comm.Get_rank():
-                    continue
-                out_state, out_action, out_reward, out_next_state,\
-                    out_absorbing = self._comm.recv(source=i)
-                state = np.append(state, out_state, axis=0)
-                action = np.append(action, out_action, axis=0)
-                reward = np.append(reward, out_reward, axis=0)
-                next_state = np.append(next_state, out_next_state, axis=0)
-                absorbing = np.append(absorbing, out_absorbing, axis=0)
+                        state.append(out_state[0])
+                        action.append(out_action[0])
+                        reward.append(out_reward[0])
+                        next_state.append(out_next_state[0])
+                        absorbing.append(out_absorbing[0])
 
-            self._comm.Barrier()
-
-            idxs = np.random.randint(self._comm.Get_size() * self._batch_size,
-                                     size=self._batch_size)
-            state = state[idxs]
-            action = action[idxs]
-            reward = reward[idxs]
-            next_state = next_state[idxs]
-            absorbing = absorbing[idxs]
+            state = np.array(state)
+            action = np.array(action)
+            reward = np.array(reward)
+            next_state = np.array(next_state)
+            absorbing = np.array(absorbing)
 
             q_next = self._next_q(next_state, absorbing)
             q = reward + self.mdp_info.gamma * q_next
