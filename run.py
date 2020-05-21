@@ -118,7 +118,7 @@ def experiment(exp_id, comm, args, folder_name):
     np.random.seed()
 
     # MDP
-    mdp = FetchEnv(args.name)
+    mdp = FetchEnv(args.name, args.reward_type)
     n_actions = mdp.info.action_space.shape[0]
     action_range = mdp.info.action_space.high - mdp.info.action_space.low
 
@@ -251,6 +251,8 @@ if __name__ == '__main__':
 
     arg_game = parser.add_argument_group('Name')
     arg_game.add_argument("--name", type=str, default='FetchReach-v1')
+    arg_game.add_argument("--reward-type", choices=['sparse', 'dense'],
+                          default='sparse')
     arg_game.add_argument("--n-exp", type=int, default=1)
 
     arg_mem = parser.add_argument_group('Replay Memory')

@@ -5,11 +5,12 @@ from mushroom_rl.utils.spaces import *
 
 
 class FetchEnv(Environment):
-    def __init__(self, name):
+    def __init__(self, name, reward_type):
         self._close_at_stop = True
 
         self.env = gym.make(name)
         self.env._max_episode_steps = np.inf
+        self.env.env.reward_type = reward_type
 
         action_space = self._convert_gym_action_space(self.env.action_space)
         observation_space = self._convert_gym_observation_space(
@@ -33,7 +34,7 @@ class FetchEnv(Environment):
             self.env.reset()
             self.env.state = state
 
-            return state
+            return np.clip(state, -200, 200)
 
     def step(self, action):
         action = self._convert_action(action)
@@ -41,7 +42,7 @@ class FetchEnv(Environment):
         state, reward, absorbing, info = self.env.step(action)
         state['info'] = info
 
-        return state, reward, absorbing, info
+        return np.clip(state, -200, 200), reward, absorbing, info
 
     def render(self, mode='human'):
         self.env.render(mode=mode)
