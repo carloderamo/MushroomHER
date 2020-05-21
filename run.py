@@ -186,7 +186,7 @@ def experiment(exp_id, comm, args, folder_name):
     scores = list()
     successes = list()
 
-    if comm.Get_rank():
+    if comm.Get_rank() == 0:
         print_epoch(0)
     agent.policy.set_weights(agent._target_actor_approximator.get_weights())
     if rank == 0:
@@ -211,7 +211,7 @@ def experiment(exp_id, comm, args, folder_name):
 
     train_episodes_per_thread = train_episodes // comm.Get_size()
     for i in range(1, max_epochs):
-        if comm.Get_rank():
+        if comm.Get_rank() == 0:
             print_epoch(i)
         agent.policy.set_weights(agent._actor_approximator.get_weights())
         sigma_policy = np.diag(action_range * .05)
