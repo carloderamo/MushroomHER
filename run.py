@@ -216,7 +216,7 @@ def experiment(exp_id, comm, args, folder_name):
         if comm.Get_rank() == 0:
             print_epoch(i)
         agent.policy.set_weights(agent._actor_approximator.get_weights())
-        sigma_policy = np.eye(n_actions) * args.max_action * args.scale_noise ** 2
+        sigma_policy = np.eye(n_actions) * (args.max_action * args.scale_noise) ** 2
         agent.policy.set_sigma(sigma_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
