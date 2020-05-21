@@ -131,14 +131,14 @@ def experiment(exp_id, comm, args, folder_name):
 
     # Settings
     if args.debug:
-        evaluation_frequency = 16
+        train_episodes = 16
         n_cycles = 4
         max_epochs = 32
         test_episodes = 4
         max_replay_size = 1000
         batch_size = 4
     else:
-        evaluation_frequency = args.evaluation_frequency
+        train_episodes = args.train_episodes
         n_cycles = args.n_cycles
         max_epochs = args.max_epochs
         test_episodes = args.test_episodes
@@ -209,14 +209,16 @@ def experiment(exp_id, comm, args, folder_name):
         comm.send(dataset, dest=0)
         comm.Barrier()
 
+    train_episodes_per_thread = train_episodes // comm.Get_size()
     for i in range(1, max_epochs):
         print_epoch(i)
         print("--Learning--")
         agent.policy.set_weights(agent._actor_approximator.get_weights())
         sigma_policy = np.diag(action_range * .05)
         agent.policy.set_sigma(sigma_policy)
-        core.learn(n_episodes=evaluation_frequency * n_cycles,
-                   n_episodes_per_fit=evaluation_frequency, quiet=args.quiet)
+        core.learn(n_episodes=train_episodes_per_thread * n_cycles,
+                   n_episodes_per_fit=train_episodes_per_thread,
+                   quiet=args.quiet)
 
         print("--Evaluation--")
         agent.policy.set_weights(agent._target_actor_approximator.get_weights())
@@ -225,8 +227,8 @@ def experiment(exp_id, comm, args, folder_name):
         if rank == 0:
             dataset = core.evaluate(n_episodes=test_episodes,
                                     render=args.render, quiet=args.quiet)
-            for i in range(1, n_threads):
-                dataset += comm.recv(source=i)
+            for th in range(1, n_threads):
+                dataset += comm.recv(source=th)
             j, s = get_stats(dataset, mdp.info.gamma)
             scores.append(j)
             successes.append(s)
@@ -269,7 +271,7 @@ if __name__ == '__main__':
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.95)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
-    arg_alg.add_argument("--evaluation-frequency", type=int, default=16,
+    arg_alg.add_argument("--train-episodes", type=int, default=16,
                          help='Number of learning episodes before each evaluation.'
                               'This number represents an epoch.')
     arg_alg.add_argument("--optimization-steps", type=int, default=40)

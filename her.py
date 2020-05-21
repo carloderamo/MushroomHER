@@ -65,7 +65,8 @@ class HER(ReplayMemory):
     def add(self, dataset):
         for i in range(len(dataset)):
             sampled_goals = self._sample_goals(dataset, i)
-            goals = np.append([dataset[i][0]['desired_goal']], sampled_goals, axis=0)
+            goals = np.append([dataset[i][0]['desired_goal']], sampled_goals,
+                              axis=0)
             for g in goals:
                 state_goal = np.append(dataset[i][0]['observation'], g)
                 self._states[self._idx] = state_goal
