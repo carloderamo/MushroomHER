@@ -125,7 +125,7 @@ def experiment(exp_id, comm, args, folder_name):
 
     # Policy
     policy_class = EpsilonGaussianPolicy
-    sigma_policy = np.eye(n_actions) * 0
+    sigma_policy = np.eye(n_actions) * 1e-10
     policy_params = dict(sigma=sigma_policy, epsilon=.2,
                          action_space=mdp.info.action_space)
 
@@ -221,7 +221,7 @@ def experiment(exp_id, comm, args, folder_name):
                    quiet=args.quiet)
 
         agent.policy.set_weights(agent._target_actor_approximator.get_weights())
-        sigma_policy = np.eye(n_actions) * 0
+        sigma_policy = np.eye(n_actions) * 1e-10
         agent.policy.set_sigma(sigma_policy)
         if rank == 0:
             dataset = core.evaluate(n_episodes=test_episodes,
