@@ -29,20 +29,23 @@ class FetchEnv(Environment):
 
     def reset(self, state=None):
         if state is None:
-            return self.env.reset()
+            state = self.env.reset()
+
+            return self.clip_dictionary_state(state)
         else:
             self.env.reset()
             self.env.state = state
 
-            return np.clip(state, -200, 200)
+            return self.clip_dictionary_state(state)
 
     def step(self, action):
         action = self._convert_action(action)
 
         state, reward, absorbing, info = self.env.step(action)
+        state = self.clip_dictionary_state(state)
         state['info'] = info
 
-        return np.clip(state, -200, 200), reward, absorbing, info
+        return state, reward, absorbing, info
 
     def render(self, mode='human'):
         self.env.render(mode=mode)
@@ -56,6 +59,13 @@ class FetchEnv(Environment):
 
     def compute_reward(self, achieved_goal, desired_goal, info):
         return self.env.compute_reward(achieved_goal, desired_goal, info)
+
+    @staticmethod
+    def clip_dictionary_state(state, value=200):
+        for k, v in state.items():
+            state[k] = np.clip(v, -value, value)
+
+        return state
 
     @staticmethod
     def _convert_gym_observation_space(space):

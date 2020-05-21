@@ -53,11 +53,12 @@ class CriticNetwork(nn.Module):
 
 
 class ActorNetwork(nn.Module):
-    def __init__(self, input_shape, output_shape, **kwargs):
+    def __init__(self, input_shape, output_shape, max_action, **kwargs):
         super().__init__()
 
         n_input = input_shape[-1]
         n_output = output_shape[0]
+        self._max_action = max_action
 
         n_features = 256
 
@@ -82,7 +83,7 @@ class ActorNetwork(nn.Module):
 
         out = torch.tanh(self._a(features3))
         if scaled:
-            return out * 5.
+            return out * self._max_action
         else:
             return out
 
@@ -120,7 +121,6 @@ def experiment(exp_id, comm, args, folder_name):
     # MDP
     mdp = FetchEnv(args.name, args.reward_type)
     n_actions = mdp.info.action_space.shape[0]
-    action_range = mdp.info.action_space.high - mdp.info.action_space.low
 
     # Policy
     policy_class = EpsilonGaussianPolicy
@@ -149,6 +149,7 @@ def experiment(exp_id, comm, args, folder_name):
     actor_params = dict(network=ActorNetwork,
                         input_shape=actor_input_shape,
                         output_shape=mdp.info.action_space.shape,
+                        max_action=args.max_action,
                         use_cuda=args.use_cuda)
 
     actor_optimizer = {'class': optim.Adam,
@@ -161,6 +162,7 @@ def experiment(exp_id, comm, args, folder_name):
                          loss=F.mse_loss,
                          input_shape=critic_input_shape,
                          output_shape=(1,),
+                         max_action=args.max_action,
                          use_cuda=args.use_cuda)
 
     if args.replay == 'her':
@@ -213,7 +215,7 @@ def experiment(exp_id, comm, args, folder_name):
         if comm.Get_rank() == 0:
             print_epoch(i)
         agent.policy.set_weights(agent._actor_approximator.get_weights())
-        sigma_policy = np.diag((action_range * .05) ** 2)
+        sigma_policy = np.diag((args.max_action * args.scale_noise) ** 2)
         agent.policy.set_sigma(sigma_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
@@ -251,9 +253,9 @@ if __name__ == '__main__':
 
     arg_game = parser.add_argument_group('Name')
     arg_game.add_argument("--name", type=str, default='FetchReach-v1')
+    arg_game.add_argument("--max-action", type=float, default=1.)
     arg_game.add_argument("--reward-type", choices=['sparse', 'dense'],
                           default='sparse')
-    arg_game.add_argument("--n-exp", type=int, default=1)
 
     arg_mem = parser.add_argument_group('Replay Memory')
     arg_mem.add_argument("--max-replay-size", type=int, default=1000000,
@@ -270,6 +272,7 @@ if __name__ == '__main__':
     arg_alg.add_argument("--batch-size", type=int, default=256,
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.95)
+    arg_alg.add_argument("--scale-noise", type=float, default=.2)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
     arg_alg.add_argument("--train-episodes", type=int, default=16,
                          help='Number of learning episodes before each evaluation.'
@@ -281,6 +284,7 @@ if __name__ == '__main__':
                          help='Number of epochs for each evaluation.')
 
     arg_utils = parser.add_argument_group('Utils')
+    arg_utils.add_argument("--n-exp", type=int, default=1)
     arg_utils.add_argument('--use-cuda', action='store_true',
                            help='Flag specifying whether to use the GPU.')
     arg_utils.add_argument('--render', action='store_true',

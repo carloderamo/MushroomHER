@@ -4,8 +4,9 @@ from mushroom_rl.policy.gaussian_policy import GaussianPolicy
 
 
 class EpsilonGaussianPolicy(GaussianPolicy):
-    def __init__(self, mu, sigma, epsilon, action_space):
+    def __init__(self, mu, sigma, epsilon, max_action, action_space):
         self._epsilon = epsilon
+        self._max_action = max_action
         self._action_space = action_space
 
         super().__init__(mu, sigma)
@@ -17,4 +18,5 @@ class EpsilonGaussianPolicy(GaussianPolicy):
         else:
             mu, sigma = self._compute_multivariate_gaussian(state)[:2]
 
-            return np.random.multivariate_normal(mu, sigma)
+            return np.clip(np.random.multivariate_normal(mu, sigma),
+                           -self._max_action, self._max_action)
