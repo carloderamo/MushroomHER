@@ -126,8 +126,7 @@ def experiment(exp_id, comm, args, folder_name):
     policy_class = EpsilonGaussianPolicy
     sigma_policy = np.eye(n_actions) * 1e-10
     policy_params = dict(sigma=sigma_policy, epsilon=args.epsilon_policy,
-                         max_action=args.max_action,
-                         action_space=mdp.info.action_space)
+                         max_action=np.ones(n_actions) * args.max_action)
 
     # Settings
     if args.debug:
