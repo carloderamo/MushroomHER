@@ -125,7 +125,7 @@ def experiment(exp_id, comm, args, folder_name):
     # Policy
     policy_class = EpsilonGaussianPolicy
     sigma_policy = np.eye(n_actions) * 1e-10
-    policy_params = dict(sigma=sigma_policy, epsilon=.3,
+    policy_params = dict(sigma=sigma_policy, epsilon=args.epsilon_policy,
                          max_action=args.max_action,
                          action_space=mdp.info.action_space)
 
@@ -191,6 +191,7 @@ def experiment(exp_id, comm, args, folder_name):
     if comm.Get_rank() == 0:
         print_epoch(0)
     agent.policy.set_weights(agent._target_actor_approximator.get_weights())
+    agent.policy.set_epsilon(0)
     if rank == 0:
         dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
                                 quiet=args.quiet)
@@ -218,6 +219,7 @@ def experiment(exp_id, comm, args, folder_name):
         agent.policy.set_weights(agent._actor_approximator.get_weights())
         sigma_policy = np.eye(n_actions) * (args.max_action * args.scale_noise) ** 2
         agent.policy.set_sigma(sigma_policy)
+        agent.policy.set_epsilon(args.epsilon_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
                    quiet=args.quiet)
@@ -225,6 +227,7 @@ def experiment(exp_id, comm, args, folder_name):
         agent.policy.set_weights(agent._target_actor_approximator.get_weights())
         sigma_policy = np.eye(n_actions) * 1e-10
         agent.policy.set_sigma(sigma_policy)
+        agent.policy.set_epsilon(0)
         if rank == 0:
             dataset = core.evaluate(n_episodes=test_episodes,
                                     render=args.render, quiet=args.quiet)
@@ -274,6 +277,7 @@ if __name__ == '__main__':
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.95)
     arg_alg.add_argument("--scale-noise", type=float, default=.2)
+    arg_alg.add_argument("--epsilon-policy", type=float, default=.3)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
     arg_alg.add_argument("--train-episodes", type=int, default=16,
                          help='Number of learning episodes before each evaluation.'

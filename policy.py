@@ -20,3 +20,6 @@ class EpsilonGaussianPolicy(GaussianPolicy):
 
             return np.clip(np.random.multivariate_normal(mu, sigma),
                            -self._max_action, self._max_action)
+
+    def set_epsilon(self, epsilon):
+        self._epsilon = epsilon
