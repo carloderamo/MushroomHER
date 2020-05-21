@@ -9,7 +9,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from joblib import delayed, Parallel
 
 from mushroom_rl.utils.dataset import compute_J, episodes_length
 from mushroom_rl.core import Core
@@ -214,7 +213,7 @@ def experiment(exp_id, comm, args, folder_name):
         if comm.Get_rank() == 0:
             print_epoch(i)
         agent.policy.set_weights(agent._actor_approximator.get_weights())
-        sigma_policy = np.diag(action_range * .05)
+        sigma_policy = np.diag((action_range * .05) ** 2)
         agent.policy.set_sigma(sigma_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
