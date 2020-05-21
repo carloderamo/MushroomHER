@@ -124,8 +124,9 @@ def experiment(exp_id, comm, args, folder_name):
 
     # Policy
     policy_class = EpsilonGaussianPolicy
-    sigma_policy = np.eye(n_actions) * 1e-10
-    policy_params = dict(sigma=sigma_policy, epsilon=args.epsilon_policy,
+    sigma_train = np.eye(n_actions) * (args.max_action * args.scale_noise) ** 2
+    sigma_test = np.eye(n_actions) * 1e-10
+    policy_params = dict(sigma=sigma_test, epsilon=args.epsilon_policy,
                          max_action=np.ones(n_actions) * args.max_action)
 
     # Settings
@@ -211,21 +212,19 @@ def experiment(exp_id, comm, args, folder_name):
         comm.send(dataset, dest=0)
         comm.Barrier()
 
-    train_episodes_per_thread = train_episodes // comm.Get_size()
+    train_episodes_per_thread = train_episodes // n_threads
     for i in range(1, max_epochs):
         if comm.Get_rank() == 0:
             print_epoch(i)
         agent.policy.set_weights(agent._actor_approximator.get_weights())
-        sigma_policy = np.eye(n_actions) * (args.max_action * args.scale_noise) ** 2
-        agent.policy.set_sigma(sigma_policy)
+        agent.policy.set_sigma(sigma_train)
         agent.policy.set_epsilon(args.epsilon_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
                    quiet=args.quiet)
 
         agent.policy.set_weights(agent._target_actor_approximator.get_weights())
-        sigma_policy = np.eye(n_actions) * 1e-10
-        agent.policy.set_sigma(sigma_policy)
+        agent.policy.set_sigma(sigma_test)
         agent.policy.set_epsilon(0)
         if rank == 0:
             dataset = core.evaluate(n_episodes=test_episodes,

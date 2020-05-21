@@ -9,7 +9,6 @@ class FetchEnv(Environment):
         self._close_at_stop = True
 
         self.env = gym.make(name)
-        self.env._max_episode_steps = np.inf
         self.env.env.reward_type = reward_type
 
         action_space = self._convert_gym_action_space(self.env.action_space)
@@ -44,6 +43,9 @@ class FetchEnv(Environment):
         state, reward, absorbing, info = self.env.step(action)
         state = self.clip_dictionary_state(state)
         state['info'] = info
+
+        if 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
+            absorbing = False
 
         return state, reward, absorbing, info
 
