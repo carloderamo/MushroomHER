@@ -27,7 +27,7 @@ class CriticNetwork(nn.Module):
         n_input = input_shape[-1]
         n_output = output_shape[0]
 
-        n_features = 64
+        n_features = 256
 
         self._h1 = nn.Linear(n_input, n_features)
         self._h2 = nn.Linear(n_features, n_features)
@@ -60,7 +60,7 @@ class ActorNetwork(nn.Module):
         n_input = input_shape[-1]
         n_output = output_shape[0]
 
-        n_features = 64
+        n_features = 256
 
         self._h1 = nn.Linear(n_input, n_features)
         self._h2 = nn.Linear(n_features, n_features)
@@ -266,7 +266,7 @@ if __name__ == '__main__':
     arg_alg.add_argument("--n-additional-goals", type=int, default=4)
     arg_alg.add_argument("--sampling", type=str, default='final',
                          choices=['final', 'future', 'episode', 'random'])
-    arg_alg.add_argument("--batch-size", type=int, default=128,
+    arg_alg.add_argument("--batch-size", type=int, default=256,
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.95)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
