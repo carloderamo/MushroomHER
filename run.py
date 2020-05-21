@@ -190,7 +190,6 @@ def experiment(exp_id, comm, args, folder_name):
 
     if comm.Get_rank() == 0:
         print_epoch(0)
-    agent.policy.set_weights(agent._target_actor_approximator.get_weights())
     agent.policy.set_epsilon(0)
     if rank == 0:
         dataset = core.evaluate(n_episodes=test_episodes, render=args.render,
@@ -216,14 +215,12 @@ def experiment(exp_id, comm, args, folder_name):
     for i in range(1, max_epochs):
         if comm.Get_rank() == 0:
             print_epoch(i)
-        agent.policy.set_weights(agent._actor_approximator.get_weights())
         agent.policy.set_sigma(sigma_train)
         agent.policy.set_epsilon(args.epsilon_policy)
         core.learn(n_episodes=train_episodes_per_thread * n_cycles,
                    n_episodes_per_fit=train_episodes_per_thread,
                    quiet=args.quiet)
 
-        agent.policy.set_weights(agent._target_actor_approximator.get_weights())
         agent.policy.set_sigma(sigma_test)
         agent.policy.set_epsilon(0)
         if rank == 0:
@@ -273,7 +270,7 @@ if __name__ == '__main__':
                          choices=['final', 'future', 'episode', 'random'])
     arg_alg.add_argument("--batch-size", type=int, default=256,
                          help='Batch size for each fit of the network.')
-    arg_alg.add_argument("--tau", type=float, default=.95)
+    arg_alg.add_argument("--tau", type=float, default=.05)
     arg_alg.add_argument("--scale-noise", type=float, default=.2)
     arg_alg.add_argument("--epsilon-policy", type=float, default=.3)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
