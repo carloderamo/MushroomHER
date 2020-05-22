@@ -139,6 +139,8 @@ class DDPG(DeepAC):
             mu = None
             sigma2 = None
         mu, sigma2 = self._comm.bcast([mu, sigma2], root=0)
-        state = normalize_and_clip(state, mu, sigma2)
+
+        if not np.any(sigma2 == 0):
+            state = normalize_and_clip(state, mu, sigma2)
 
         return self.policy.draw_action(state)

@@ -16,7 +16,7 @@ class FetchEnv(Environment):
             self.env.observation_space
         )
         gamma = .98
-        horizon = 50
+        horizon = self.env._max_episode_steps
         mdp_info = MDPInfo(observation_space, action_space, gamma, horizon)
 
         if isinstance(action_space, Discrete):
@@ -44,7 +44,9 @@ class FetchEnv(Environment):
         state = self.clip_dictionary_state(state)
         state['info'] = info
 
-        if 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
+        if info['is_success']:
+            absorbing = True
+        elif 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
             absorbing = False
 
         return state, reward, absorbing, info
