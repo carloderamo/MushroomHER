@@ -64,12 +64,12 @@ class DDPG(DeepAC):
     def fit(self, dataset):
         if self._comm.Get_rank() == 0:
             self._replay_memory.add(dataset)
-            for i in range(self._comm.Get_size()):
-                if i == self._comm.Get_rank():
-                    continue
+            for i in range(1, self._comm.Get_size()):
                 dataset += self._comm.recv(source=i)
+            self._comm.Barrier()
         else:
             self._comm.send(dataset, dest=0)
+            self._comm.Barrier()
 
         for _ in range(self._optimization_steps):
             if self._comm.Get_rank() == 0:

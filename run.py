@@ -188,7 +188,7 @@ def experiment(exp_id, comm, args, folder_name):
     scores = list()
     successes = list()
 
-    if comm.Get_rank() == 0:
+    if rank == 0:
         print_epoch(0)
     agent.policy.set_epsilon(0)
     if rank == 0:
@@ -200,9 +200,8 @@ def experiment(exp_id, comm, args, folder_name):
         scores.append(j)
         successes.append(s)
 
-        if comm.Get_rank() == 0:
-            np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-            np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+        np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+        np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
 
         comm.Barrier()
     else:
@@ -213,7 +212,7 @@ def experiment(exp_id, comm, args, folder_name):
 
     train_episodes_per_thread = train_episodes // n_threads
     for i in range(1, max_epochs):
-        if comm.Get_rank() == 0:
+        if rank == 0:
             print_epoch(i)
         agent.policy.set_sigma(sigma_train)
         agent.policy.set_epsilon(args.epsilon_policy)
@@ -232,9 +231,8 @@ def experiment(exp_id, comm, args, folder_name):
             scores.append(j)
             successes.append(s)
 
-            if comm.Get_rank() == 0:
-                np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
-                np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
+            np.save(folder_name + '/scores_%d.npy' % exp_id, scores)
+            np.save(folder_name + '/successes_%d.npy' % exp_id, successes)
 
             comm.Barrier()
         else:
