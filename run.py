@@ -273,8 +273,8 @@ if __name__ == '__main__':
     arg_alg.add_argument("--epsilon-policy", type=float, default=.3)
     arg_alg.add_argument("--n-cycles", type=int, default=50)
     arg_alg.add_argument("--train-episodes", type=int, default=16,
-                         help='Number of learning episodes before each evaluation.'
-                              'This number represents an epoch.')
+                         help='Number of learning episodes before each'
+                              'evaluation. This number represents an epoch.')
     arg_alg.add_argument("--optimization-steps", type=int, default=40)
     arg_alg.add_argument("--max-epochs", type=int, default=200,
                          help='Total number of learning steps.')
