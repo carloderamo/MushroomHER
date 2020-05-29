@@ -14,7 +14,7 @@ class HER(ReplayMemory):
         if sampling == 'final':
             def sample_goals(dataset, i):
                 abs_idxs = np.cumsum(episodes_length(dataset)) - 1
-                idx = abs_idxs[0] if i <= abs_idxs[0] else abs_idxs[abs_idxs >= i][0]
+                idx = abs_idxs[abs_idxs >= i][0]
                 sampled_goals = np.array([dataset[idx][3]['achieved_goal']])
 
                 return sampled_goals
