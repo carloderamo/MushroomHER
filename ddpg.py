@@ -115,7 +115,7 @@ class DDPG(DeepAC):
                                           scaled=False)
         q = self._critic_approximator(state, action, output_tensor=True)
 
-        return -q.mean() + action.norm() ** 2
+        return -q.mean() + (action ** 2).mean()
 
     def _next_q(self, next_state):
         a = self._target_actor_approximator(next_state)
