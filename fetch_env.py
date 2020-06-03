@@ -40,14 +40,11 @@ class FetchEnv(Environment):
     def step(self, action):
         action = self._convert_action(action)
 
-        state, reward, absorbing, info = self.env.step(action)
+        state, reward, _, info = self.env.step(action)
         state = self.clip_dictionary_state(state)
         state['info'] = info
 
-        if 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
-            absorbing = False
-
-        return state, reward, absorbing, info
+        return state, reward, False, info
 
     def render(self, mode='human'):
         self.env.render(mode=mode)

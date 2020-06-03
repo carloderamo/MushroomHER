@@ -75,7 +75,6 @@ class HER(ReplayMemory):
                 self._rewards[self._idx] = self._reward_function(
                     dataset[i][3]['achieved_goal'], g, {}
                 )
-                self._absorbing[self._idx] = self._rewards[self._idx] == 0
 
                 self._idx += 1
                 if self._idx == self._max_size:
@@ -92,8 +91,8 @@ class HER(ReplayMemory):
                 ) / self._count
 
     def get(self, n_samples):
-        s, a, r, ss, ab, last = super().get(n_samples)
+        s, a, r, ss, _, _ = super().get(n_samples)
         s = normalize_and_clip(s, self._mu, self._sigma2)
         ss = normalize_and_clip(ss, self._mu, self._sigma2)
 
-        return s, np.array(a), np.array(r), ss, np.array(ab), np.array(last)
+        return s, np.array(a), np.array(r), ss

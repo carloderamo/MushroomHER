@@ -73,16 +73,15 @@ class DDPG(DeepAC):
 
         for _ in range(self._optimization_steps):
             if self._comm.Get_rank() == 0:
-                state, action, reward, next_state, absorbing, _ =\
+                state, action, reward, next_state =\
                     self._replay_memory.get(self._batch_size * self._comm.Get_size())
             else:
                 state = None
                 action = None
                 reward = None
                 next_state = None
-                absorbing = None
-            state, action, reward, next_state, absorbing = self._comm.bcast(
-                [state, action, reward, next_state, absorbing], root=0
+            state, action, reward, next_state = self._comm.bcast(
+                [state, action, reward, next_state], root=0
             )
 
             start = self._batch_size * self._comm.Get_rank()
@@ -91,9 +90,8 @@ class DDPG(DeepAC):
             action = action[start:stop]
             reward = reward[start:stop]
             next_state = next_state[start:stop]
-            absorbing = absorbing[start:stop]
 
-            q_next = self._next_q(next_state, absorbing)
+            q_next = self._next_q(next_state)
             q = reward + self.mdp_info.gamma * q_next
             q = np.clip(q, -1 / (1 - self.mdp_info.gamma), 0)
 
@@ -118,11 +116,10 @@ class DDPG(DeepAC):
 
         return -q.mean() + action.norm() ** 2
 
-    def _next_q(self, next_state, absorbing):
+    def _next_q(self, next_state):
         a = self._target_actor_approximator(next_state)
 
         q = self._target_critic_approximator.predict(next_state, a)
-        q *= 1 - absorbing
 
         return q
 
