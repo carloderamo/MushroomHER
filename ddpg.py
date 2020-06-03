@@ -63,9 +63,10 @@ class DDPG(DeepAC):
 
     def fit(self, dataset):
         if self._comm.Get_rank() == 0:
-            self._replay_memory.add(dataset)
             for i in range(1, self._comm.Get_size()):
                 dataset += self._comm.recv(source=i)
+            self._replay_memory.add(dataset)
+
             self._comm.Barrier()
         else:
             self._comm.send(dataset, dest=0)

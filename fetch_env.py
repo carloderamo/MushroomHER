@@ -1,3 +1,5 @@
+from copy import copy
+
 import gym
 
 from mushroom_rl.environments.gym_env import Environment, MDPInfo
@@ -42,7 +44,7 @@ class FetchEnv(Environment):
 
         state, reward, _, info = self.env.step(action)
         state = self.clip_dictionary_state(state)
-        state['info'] = info
+        state['info'] = copy(info)
 
         return state, reward, False, info
 
