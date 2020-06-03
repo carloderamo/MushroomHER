@@ -71,12 +71,11 @@ class HER(ReplayMemory):
                 self._actions[self._idx] = dataset[i][1]
                 next_state_goal = np.append(dataset[i][3]['observation'], g)
                 self._next_states[self._idx] = next_state_goal
-                self._absorbing[self._idx] = dataset[i][4]
-                self._last[self._idx] = dataset[i][5]
 
                 self._rewards[self._idx] = self._reward_function(
                     dataset[i][3]['achieved_goal'], g, {}
                 )
+                self._absorbing[self._idx] = self._rewards[self._idx] == 0
 
                 self._idx += 1
                 if self._idx == self._max_size:

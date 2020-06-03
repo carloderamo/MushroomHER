@@ -44,9 +44,7 @@ class FetchEnv(Environment):
         state = self.clip_dictionary_state(state)
         state['info'] = info
 
-        if info['is_success']:
-            absorbing = True
-        elif 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
+        if 'TimeLimit.truncated' in info and info['TimeLimit.truncated']:
             absorbing = False
 
         return state, reward, absorbing, info
