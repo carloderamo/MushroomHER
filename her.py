@@ -10,6 +10,7 @@ class HER(ReplayMemory):
     def __init__(self, max_size, reward_function, n_additional_goals, sampling):
         self._reward_function = reward_function
         self._n_additional_goals = n_additional_goals
+        self._future_p = 1. - (1 / (1 + n_additional_goals))
 
         if sampling == 'final':
             def sample_goals(dataset, i):
@@ -61,34 +62,21 @@ class HER(ReplayMemory):
         super().__init__(0, max_size)
 
     def add(self, dataset):
+        idxs_map = dict()
         for i in range(len(dataset)):
+            desired_goal = dataset[i][0]['desired_goal']
+            state_goal = self._add_transition(dataset, desired_goal, self._idx, i)
+            self._update_idx()
+
+            idxs_map[i] = self._idx
+
+            self._update_normalization(state_goal)
+
+        her_idxs = np.where(np.random.rand(len(dataset)) < self._future_p)[0]
+        for i in her_idxs:
             sampled_goals = self._sample_goals(dataset, i)
-            goals = np.append([dataset[i][0]['desired_goal']], sampled_goals,
-                              axis=0)
-            for g in goals:
-                state_goal = np.append(dataset[i][0]['observation'], g)
-                self._states[self._idx] = state_goal
-                self._actions[self._idx] = dataset[i][1]
-                next_state_goal = np.append(dataset[i][3]['observation'], g)
-                self._next_states[self._idx] = next_state_goal
-
-                self._rewards[self._idx] = self._reward_function(
-                    dataset[i][3]['achieved_goal'], g, {}
-                )
-
-                self._idx += 1
-                if self._idx == self._max_size:
-                    self._full = True
-                    self._idx = 0
-
-                self._count += 1
-                prev_mu = self._mu
-                self._mu = (
-                    self._mu * (self._count - 1) + state_goal
-                ) / self._count
-                self._sigma2 = (self._sigma2 * (self._count - 1) + (
-                    state_goal - prev_mu) * (state_goal - self._mu)
-                ) / self._count
+            for g in sampled_goals:
+                self._add_transition(dataset, g, idxs_map[i], i)
 
     def get(self, n_samples):
         s, a, r, ss, _, _ = super().get(n_samples)
@@ -96,3 +84,30 @@ class HER(ReplayMemory):
         ss = normalize_and_clip(ss, self._mu, self._sigma2)
 
         return s, np.array(a), np.array(r), ss
+
+    def _add_transition(self, dataset, g, replay_idx, idx):
+        state_goal = np.append(dataset[idx][0]['observation'], g)
+        self._states[replay_idx] = state_goal
+        self._actions[replay_idx] = dataset[idx][1]
+        next_state_goal = np.append(dataset[idx][3]['observation'], g)
+        self._next_states[replay_idx] = next_state_goal
+
+        self._rewards[replay_idx] = self._reward_function(
+            dataset[idx][3]['achieved_goal'], g, {}
+        )
+
+        return state_goal
+
+    def _update_idx(self):
+        self._idx += 1
+        if self._idx == self._max_size:
+            self._full = True
+            self._idx = 0
+
+    def _update_normalization(self, state_goal):
+        self._count += 1
+        prev_mu = self._mu
+        self._mu = (self._mu * (self._count - 1) + state_goal) / self._count
+        self._sigma2 = (
+            self._sigma2 * (self._count - 1) + (state_goal - prev_mu) * (
+                state_goal - self._mu)) / self._count

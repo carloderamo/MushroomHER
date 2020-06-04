@@ -264,7 +264,7 @@ if __name__ == '__main__':
     arg_alg.add_argument("--replay", type=str, default='her',
                          choices=['her', 'cher', 'dher'])
     arg_alg.add_argument("--n-additional-goals", type=int, default=4)
-    arg_alg.add_argument("--sampling", type=str, default='final',
+    arg_alg.add_argument("--sampling", type=str, default='future',
                          choices=['final', 'future', 'episode', 'random'])
     arg_alg.add_argument("--batch-size", type=int, default=256,
                          help='Batch size for each fit of the network.')
