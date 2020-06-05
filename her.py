@@ -9,7 +9,6 @@ from utils import normalize_and_clip
 class HER(ReplayMemory):
     def __init__(self, max_size, reward_function, n_additional_goals, sampling):
         self._reward_function = reward_function
-        self._n_additional_goals = n_additional_goals
         self._future_p = 1. - (1 / (1 + n_additional_goals))
 
         if sampling == 'final':
@@ -24,11 +23,8 @@ class HER(ReplayMemory):
                 abs_idxs = np.cumsum(episodes_length(dataset))
                 prev_abs_idxs = abs_idxs[abs_idxs <= i]
                 episode_end = abs_idxs[len(prev_abs_idxs)]
-                sampled_idxs = np.random.randint(i, episode_end,
-                                                 size=self._n_additional_goals)
-                sampled_goals = np.array(
-                    [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
-                )
+                idx = np.random.randint(i, episode_end)
+                sampled_goals = np.array([dataset[idx][3]['achieved_goal']])
                 return sampled_goals
         elif sampling == 'episode':
             def sample_goals(dataset, i):
@@ -36,16 +32,12 @@ class HER(ReplayMemory):
                 prev_abs_idxs = abs_idxs[abs_idxs <= i]
                 episode_start = prev_abs_idxs[-1] if len(prev_abs_idxs) > 0 else 0
                 episode_end = abs_idxs[len(prev_abs_idxs)]
-                sampled_idxs = np.random.randint(episode_start, episode_end,
-                                                 size=self._n_additional_goals)
-                sampled_goals = np.array(
-                    [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
-                )
+                idx = np.random.randint(episode_start, episode_end)
+                sampled_goals = np.array([dataset[idx][3]['achieved_goal']])
                 return sampled_goals
         elif sampling == 'random':
             def sample_goals(dataset, _):
-                sampled_idxs = np.random.choice(len(dataset),
-                                                size=self._n_additional_goals)
+                sampled_idxs = np.random.choice(len(dataset))
                 sampled_goals = np.array(
                     [dataset[x][3]['achieved_goal'] for x in sampled_idxs]
                 )
