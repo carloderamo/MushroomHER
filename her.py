@@ -66,9 +66,8 @@ class HER(ReplayMemory):
 
         her_idxs = np.where(np.random.rand(len(dataset)) < self._future_p)[0]
         for i in her_idxs:
-            sampled_goals = self._sample_goals(dataset, i)
-            for g in sampled_goals:
-                self._add_transition(dataset, g, idxs_map[i], i)
+            sampled_goal = self._sample_goals(dataset, i)
+            self._add_transition(dataset, sampled_goal, idxs_map[i], i)
 
     def get(self, n_samples):
         s, a, r, ss, _, _ = super().get(n_samples)
