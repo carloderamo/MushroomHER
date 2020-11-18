@@ -146,7 +146,7 @@ def experiment(exp_id, comm, args, folder_name):
         batch_size = args.batch_size
 
     # Approximator
-    actor_input_shape = mdp.info.observation_space.shape
+    actor_input_shape = mdp.info.observation_space.shape + mdp.goal_space.shape
     actor_params = dict(network=ActorNetwork,
                         input_shape=actor_input_shape,
                         output_shape=mdp.info.action_space.shape,
@@ -167,8 +167,8 @@ def experiment(exp_id, comm, args, folder_name):
                          use_cuda=args.use_cuda)
 
     if args.replay == 'her':
-        replay_memory = HER(mdp.info.horizon, max_replay_size, mdp.compute_reward,
-                            args.n_additional_goals, args.sampling)
+        replay_memory = HER(mdp.info.horizon, mdp.info.observation_space, mdp.goal_space, mdp.info.action_space,
+                            max_replay_size, mdp.compute_reward, args.n_additional_goals)
     else:
         raise ValueError
 
@@ -264,8 +264,6 @@ if __name__ == '__main__':
     arg_alg.add_argument("--replay", type=str, default='her',
                          choices=['her', 'cher', 'dher'])
     arg_alg.add_argument("--n-additional-goals", type=int, default=4)
-    arg_alg.add_argument("--sampling", type=str, default='future',
-                         choices=['final', 'future', 'episode', 'random'])
     arg_alg.add_argument("--batch-size", type=int, default=256,
                          help='Batch size for each fit of the network.')
     arg_alg.add_argument("--tau", type=float, default=.05)
