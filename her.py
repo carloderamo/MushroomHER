@@ -1,12 +1,12 @@
 import numpy as np
 from mushroom_rl.core import Serializable
-from mushroom_rl.utils.dataset import episodes_length
 
 from utils import normalize_and_clip
 
 
 class HER(Serializable):
-    def __init__(self, horizon, max_size, reward_function, n_additional_goals, sampling):
+    def __init__(self, horizon, observation_space, goal_space, action_space,
+                 max_size, reward_function, n_additional_goals):
         assert max_size % horizon == 0
 
         self._initial_size = 0
@@ -34,38 +34,6 @@ class HER(Serializable):
         self._reward_function = reward_function
         self._future_p = 1. - (1 / (1 + n_additional_goals))
 
-        if sampling == 'final':
-            def sample_goals(ss, i):
-                abs_idxs = np.cumsum(episodes_length(dataset)) - 1
-                idx = abs_idxs[abs_idxs >= i][0]
-                sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
-
-                return sampled_goals
-        elif sampling == 'future':
-            def sample_goals(episode, step):
-                idx = np.random.randint(step, self._horizon)
-                s_goal = self._states[episode][idx]['achieved_goal']
-                ss_goal = self._next_states[episode][idx]['achieved_goal']
-
-                return s_goal, ss_goal
-        elif sampling == 'episode':
-            def sample_goals(episode, _):
-                idx = np.random.randint(self._horizon)
-                s_goal = self._states[episode][idx]['achieved_goal']
-                ss_goal = self._next_states[episode][idx]['achieved_goal']
-
-                return s_goal, ss_goal
-        elif sampling == 'random':
-            def sample_goals(ss, _):
-                idx = np.random.choice(len(dataset))
-                sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
-
-                return sampled_goals
-        else:
-            raise ValueError
-
-        self._sample_goals = sample_goals
-
         self._mu = 0
         self._sigma2 = 0
         self._count = 0
@@ -78,8 +46,7 @@ class HER(Serializable):
                 self._rewards[self._idx_episode][j] = 0
                 self._next_states[self._idx_episode][j] = dataset[i][3]
 
-            if i % self._horizon == 0:
-                self._update_idx_episode()
+            self._update_idx_episode()
 
     def get(self, n_samples):
         s = list()
@@ -91,6 +58,7 @@ class HER(Serializable):
 
         idx_episodes = np.random.randint(self.size, size=n_samples)
         idx_samples = np.random.randint(self._horizon, size=n_samples)
+        idx_sample_goals = np.random.randint(idx_samples, self._horizon, size=n_samples)
         her_idxs_episode = np.where(np.random.rand(n_samples) < self._future_p)[0]
         for i in range(n_samples):
             idx_ep = idx_episodes[i]
@@ -99,8 +67,10 @@ class HER(Serializable):
             a.append(self._actions[idx_ep][idx_sam])
             ss.append(self._next_states[idx_ep][idx_sam])
 
+            idx_sam_goal = idx_sample_goals[i]
             if i in her_idxs_episode:
-                s_goal, ss_goal = self._sample_goals(idx_ep, idx_sam)
+                s_goal = self._states[idx_ep][idx_sam_goal]['achieved_goal']
+                ss_goal = self._next_states[idx_ep][idx_sam_goal]['achieved_goal']
             else:
                 s_goal, ss_goal = s[i]['desired_goal'], ss[i]['desired_goal']
 
@@ -124,8 +94,6 @@ class HER(Serializable):
         self._actions = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
         self._rewards = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
         self._next_states = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
-        self._absorbing = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
-        self._last = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
 
     def _update_idx_episode(self):
         self._idx_episode += 1
