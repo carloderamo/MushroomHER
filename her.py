@@ -71,10 +71,10 @@ class HER(Serializable):
                 ss_goal = self._next_states[idx_ep][idx_sam_goal]['achieved_goal']
             else:
                 s_goal = self._states[idx_ep][idx_sam]['desired_goal']
-                ss_goal = self._states[idx_ep][idx_sam]['desired_goal']
+                ss_goal = self._next_states[idx_ep][idx_sam]['desired_goal']
 
             s_augmented.append(np.append(
-                self._states[idx_ep][idx_sam][i]['observation'], s_goal
+                self._states[idx_ep][idx_sam]['observation'], s_goal
             ))
             ss_augmented.append(np.append(
                 self._next_states[idx_ep][idx_sam]['observation'], ss_goal
