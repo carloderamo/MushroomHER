@@ -14,7 +14,7 @@ class FetchEnv(Environment):
         self.env.env.reward_type = reward_type
 
         action_space = self._convert_gym_action_space(self.env.action_space)
-        observation_space = self._convert_gym_observation_space(
+        observation_space, self.goal_space = self._convert_gym_observation_space(
             self.env.observation_space
         )
         gamma = .98
@@ -70,11 +70,8 @@ class FetchEnv(Environment):
 
     @staticmethod
     def _convert_gym_observation_space(space):
-        low = np.append(space['observation'].low, space['desired_goal'].low)
-        high = np.append(space['observation'].high, space['desired_goal'].high)
-        shape = (space['observation'].shape[0] + space['desired_goal'].shape[0],)
-
-        return Box(low=low, high=high, shape=shape)
+        return Box(low=space['observation'].low, high=space['observation'].high, shape=space['observation'].shape),\
+               Box(low=space['desired_goal'].low, high=space['desired_goal'].high, shape=space['desired_goal'].shape)
 
     @staticmethod
     def _convert_gym_action_space(space):

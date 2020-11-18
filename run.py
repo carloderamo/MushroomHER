@@ -146,7 +146,7 @@ def experiment(exp_id, comm, args, folder_name):
         batch_size = args.batch_size
 
     # Approximator
-    actor_input_shape = mdp.info.observation_space.shape + mdp.goal_space.shape
+    actor_input_shape = (mdp.info.observation_space.shape[0] + mdp.goal_space.shape[0],)
     actor_params = dict(network=ActorNetwork,
                         input_shape=actor_input_shape,
                         output_shape=mdp.info.action_space.shape,
