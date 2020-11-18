@@ -167,7 +167,7 @@ def experiment(exp_id, comm, args, folder_name):
                          use_cuda=args.use_cuda)
 
     if args.replay == 'her':
-        replay_memory = HER(max_replay_size, mdp.compute_reward,
+        replay_memory = HER(mdp.info.horizon, max_replay_size, mdp.compute_reward,
                             args.n_additional_goals, args.sampling)
     else:
         raise ValueError

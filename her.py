@@ -1,43 +1,62 @@
 import numpy as np
-
-from mushroom_rl.utils.replay_memory import ReplayMemory
+from mushroom_rl.core import Serializable
 from mushroom_rl.utils.dataset import episodes_length
 
 from utils import normalize_and_clip
 
 
-class HER(ReplayMemory):
-    def __init__(self, max_size, reward_function, n_additional_goals, sampling):
+class HER(Serializable):
+    def __init__(self, horizon, max_size, reward_function, n_additional_goals, sampling):
+        assert max_size % horizon == 0
+
+        self._initial_size = 0
+        self._horizon = horizon
+        self._max_size = max_size
+        self._n_episodes = self._max_size // self._horizon
+
+        self.reset()
+
+        self._add_save_attr(
+            _initial_size='pickle',
+            _horizon='pickle',
+            _max_size='pickle',
+            _n_episodes='pickle',
+            _idx_episode='pickle!',
+            _full='pickle!',
+            _states='pickle!',
+            _actions='pickle!',
+            _rewards='pickle!',
+            _next_states='pickle!',
+            _absorbing='pickle!',
+            _last='pickle!'
+        )
+
         self._reward_function = reward_function
         self._future_p = 1. - (1 / (1 + n_additional_goals))
 
         if sampling == 'final':
-            def sample_goals(dataset, i):
+            def sample_goals(ss, i):
                 abs_idxs = np.cumsum(episodes_length(dataset)) - 1
                 idx = abs_idxs[abs_idxs >= i][0]
                 sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
 
                 return sampled_goals
         elif sampling == 'future':
-            def sample_goals(dataset, i):
-                abs_idxs = np.cumsum(episodes_length(dataset))
-                episode_end = abs_idxs[abs_idxs > i][0]
-                idx = np.random.randint(i, episode_end)
-                sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
+            def sample_goals(episode, step):
+                idx = np.random.randint(step, self._horizon)
+                s_goal = self._states[episode][idx]['achieved_goal']
+                ss_goal = self._next_states[episode][idx]['achieved_goal']
 
-                return sampled_goals
+                return s_goal, ss_goal
         elif sampling == 'episode':
-            def sample_goals(dataset, i):
-                abs_idxs = np.cumsum(episodes_length(dataset))
-                idxs = abs_idxs[abs_idxs <= i]
-                episode_start = idxs[-1] if len(idxs) > 0 else 0
-                episode_end = abs_idxs[abs_idxs > i][0]
-                idx = np.random.randint(episode_start, episode_end)
-                sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
+            def sample_goals(episode, _):
+                idx = np.random.randint(self._horizon)
+                s_goal = self._states[episode][idx]['achieved_goal']
+                ss_goal = self._next_states[episode][idx]['achieved_goal']
 
-                return sampled_goals
+                return s_goal, ss_goal
         elif sampling == 'random':
-            def sample_goals(dataset, _):
+            def sample_goals(ss, _):
                 idx = np.random.choice(len(dataset))
                 sampled_goals = np.array(dataset[idx][3]['achieved_goal'])
 
@@ -51,49 +70,68 @@ class HER(ReplayMemory):
         self._sigma2 = 0
         self._count = 0
 
-        super().__init__(0, max_size)
-
     def add(self, dataset):
-        idxs_map = dict()
         for i in range(len(dataset)):
-            desired_goal = dataset[i][0]['desired_goal']
-            state_goal = self._add_transition(dataset, desired_goal, self._idx, i)
-            self._update_idx()
+            for j in range(self._horizon):
+                self._states[self._idx_episode][j] = dataset[i][0]
+                self._actions[self._idx_episode][j] = dataset[i][1]
+                self._rewards[self._idx_episode][j] = 0
+                self._next_states[self._idx_episode][j] = dataset[i][3]
 
-            idxs_map[i] = self._idx
-
-            self._update_normalization(state_goal)
-
-        her_idxs = np.where(np.random.rand(len(dataset)) < self._future_p)[0]
-        for i in her_idxs:
-            sampled_goal = self._sample_goals(dataset, i)
-            self._add_transition(dataset, sampled_goal, idxs_map[i], i)
+            if i % self._horizon == 0:
+                self._update_idx_episode()
 
     def get(self, n_samples):
-        s, a, r, ss, _, _ = super().get(n_samples)
-        s = normalize_and_clip(s, self._mu, self._sigma2)
-        ss = normalize_and_clip(ss, self._mu, self._sigma2)
+        s = list()
+        a = list()
+        r = list()
+        ss = list()
+        s_augmented = list()
+        ss_augmented = list()
 
-        return s, np.array(a), np.array(r), ss
+        idx_episodes = np.random.randint(self.size, size=n_samples)
+        idx_samples = np.random.randint(self._horizon, size=n_samples)
+        her_idxs_episode = np.where(np.random.rand(n_samples) < self._future_p)[0]
+        for i in range(n_samples):
+            idx_ep = idx_episodes[i]
+            idx_sam = idx_samples[i]
+            s.append(self._states[idx_ep][idx_sam])
+            a.append(self._actions[idx_ep][idx_sam])
+            ss.append(self._next_states[idx_ep][idx_sam])
 
-    def _add_transition(self, dataset, g, replay_idx, idx):
-        state_goal = np.append(dataset[idx][0]['observation'], g)
-        self._states[replay_idx] = state_goal
-        self._actions[replay_idx] = dataset[idx][1]
-        next_state_goal = np.append(dataset[idx][3]['observation'], g)
-        self._next_states[replay_idx] = next_state_goal
+            if i in her_idxs_episode:
+                s_goal, ss_goal = self._sample_goals(idx_ep, idx_sam)
+            else:
+                s_goal, ss_goal = s[i]['desired_goal'], ss[i]['desired_goal']
 
-        self._rewards[replay_idx] = self._reward_function(
-            dataset[idx][3]['achieved_goal'], g, {}
-        )
+            s_augmented.append(np.append(s[i]['observation'], s_goal))
+            ss_augmented.append(np.append(ss[i]['observation'], ss_goal))
 
-        return state_goal
+            self._update_normalization(s_augmented[i])
+            self._update_normalization(ss_augmented[i])
 
-    def _update_idx(self):
-        self._idx += 1
-        if self._idx == self._max_size:
+            r.append(self._reward_function(ss[i]['achieved_goal'], ss_goal, {}))
+
+        s_augmented = normalize_and_clip(np.array(s_augmented), self._mu, self._sigma2)
+        ss_augmented = normalize_and_clip(np.array(ss_augmented), self._mu, self._sigma2)
+
+        return s_augmented, np.array(a), np.array(r), ss_augmented
+
+    def reset(self):
+        self._idx_episode = 0
+        self._full = False
+        self._states = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+        self._actions = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+        self._rewards = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+        self._next_states = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+        self._absorbing = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+        self._last = [[None for _ in range(self._horizon)] for _ in range(self._n_episodes)]
+
+    def _update_idx_episode(self):
+        self._idx_episode += 1
+        if self._idx_episode == self._n_episodes:
             self._full = True
-            self._idx = 0
+            self._idx_episode = 0
 
     def _update_normalization(self, state_goal):
         self._count += 1
@@ -102,3 +140,15 @@ class HER(ReplayMemory):
         self._sigma2 = (
             self._sigma2 * (self._count - 1) + (state_goal - prev_mu) * (
                 state_goal - self._mu)) / self._count
+
+    @property
+    def initialized(self):
+        return self.size > self._initial_size
+
+    @property
+    def size(self):
+        return self._idx_episode if not self._full else self._n_episodes
+
+    def _post_load(self):
+        if self._full is None:
+            self.reset()
