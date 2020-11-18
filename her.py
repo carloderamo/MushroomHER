@@ -49,38 +49,44 @@ class HER(Serializable):
             self._update_idx_episode()
 
     def get(self, n_samples):
-        s = list()
         a = list()
         r = list()
-        ss = list()
         s_augmented = list()
         ss_augmented = list()
 
         idx_episodes = np.random.randint(self.size, size=n_samples)
         idx_samples = np.random.randint(self._horizon, size=n_samples)
-        idx_sample_goals = np.random.randint(idx_samples, self._horizon, size=n_samples)
+        idx_sample_goals = np.random.randint(idx_samples, self._horizon,
+                                             size=n_samples)
         her_idxs_episode = np.where(np.random.rand(n_samples) < self._future_p)[0]
         for i in range(n_samples):
             idx_ep = idx_episodes[i]
             idx_sam = idx_samples[i]
-            s.append(self._states[idx_ep][idx_sam])
-            a.append(self._actions[idx_ep][idx_sam])
-            ss.append(self._next_states[idx_ep][idx_sam])
 
-            idx_sam_goal = idx_sample_goals[i]
+            a.append(self._actions[idx_ep][idx_sam])
+
             if i in her_idxs_episode:
+                idx_sam_goal = idx_sample_goals[i]
                 s_goal = self._states[idx_ep][idx_sam_goal]['achieved_goal']
                 ss_goal = self._next_states[idx_ep][idx_sam_goal]['achieved_goal']
             else:
-                s_goal, ss_goal = s[i]['desired_goal'], ss[i]['desired_goal']
+                s_goal = self._states[idx_ep][idx_sam]['desired_goal']
+                ss_goal = self._states[idx_ep][idx_sam]['desired_goal']
 
-            s_augmented.append(np.append(s[i]['observation'], s_goal))
-            ss_augmented.append(np.append(ss[i]['observation'], ss_goal))
+            s_augmented.append(np.append(
+                self._states[idx_ep][idx_sam][i]['observation'], s_goal
+            ))
+            ss_augmented.append(np.append(
+                self._next_states[idx_ep][idx_sam]['observation'], ss_goal
+            ))
 
             self._update_normalization(s_augmented[i])
             self._update_normalization(ss_augmented[i])
 
-            r.append(self._reward_function(ss[i]['achieved_goal'], ss_goal, {}))
+            r.append(self._reward_function(
+                self._next_states[idx_ep][idx_sam]['achieved_goal'],
+                ss_goal, {}
+            ))
 
         s_augmented = normalize_and_clip(np.array(s_augmented), self._mu, self._sigma2)
         ss_augmented = normalize_and_clip(np.array(ss_augmented), self._mu, self._sigma2)
